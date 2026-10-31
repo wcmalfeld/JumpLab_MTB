@@ -1,0 +1,1910 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mathlete Jump Lab</title>
+
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one wide "trail-side instrument" — big side-view canvas left,
+   setup + mission cards right; math workbench under the canvas.
+   Single dark theme by design (PRD §8: dark, trail-inspired). */
+:root {
+  color-scheme: dark;
+  --night: #10130f;      /* page */
+  --panel: #171b15;      /* cards */
+  --panel-2: #1f241c;    /* raised */
+  --line: #2e3529;
+  --bone: #ece6d6;       /* text */
+  --muted: #a0a795;
+  --faint: #6d7464;
+  --accent: #f0a23b;     /* trail-marker amber */
+  --accent-ink: #1b1206;
+  --dirt: #6e4728;
+  --dirt-hi: #a8743f;
+  --dirt-lo: #3d2716;
+  --sky-top: #141a1e;
+  --sky-bot: #1b2219;
+  --good: #82cf84;
+  --bad: #f0705c;
+  --warn: #e8c64e;
+  --vx: #72bbea;
+  --vy: #ea92c6;
+  --cmpA: #72bbea;
+  --cmpB: #c6a2f2;
+  --f-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --r: 10px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--night); color: var(--bone); }
+body {
+  font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 32px;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- top bar ---------- */
+.topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; max-width: 1480px; margin: 0 auto 14px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand small { font: 600 11px/1 var(--f-body); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.brand h1 { margin: 0; font: 800 34px/1 var(--f-display); letter-spacing: .01em; text-transform: uppercase; }
+.brand h1 span { color: var(--accent); }
+.seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.seg button { border: 0; background: none; padding: 6px 14px; border-radius: 999px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 14px; }
+.seg button[aria-pressed="true"], .seg button[aria-selected="true"] { background: var(--bone); color: var(--night); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px; min-height: 40px; }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font: 800 19px/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase; padding: 10px 22px; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.ghost { background: none; }
+.btn.small { min-height: 32px; padding: 5px 10px; font-size: 13px; }
+.btn[aria-pressed="true"] { background: var(--bone); color: var(--night); border-color: var(--bone); }
+
+/* ---------- layout ---------- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: 16px; max-width: 1480px; margin: 0 auto; align-items: start; }
+.main-col, .side { display: grid; gap: 16px; min-width: 0; }
+@media (max-width: 1040px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.panel h2 { margin: 0 0 12px; font: 800 20px/1.1 var(--f-display); text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+.eyebrow { font: 600 11px/1 var(--f-body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- stage ---------- */
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.canvas-wrap { position: relative; }
+#scene { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--night) 82%, transparent); padding: 16px; }
+.overlay-card { max-width: 520px; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; text-align: left; }
+.overlay-card h3 { margin: 0 0 8px; font: 800 26px/1.1 var(--f-display); text-transform: uppercase; text-wrap: balance; }
+.overlay-card p { margin: 0 0 14px; color: var(--muted); }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.transport .grow { flex: 1 1 200px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.transport label { font-size: 13px; color: var(--muted); }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: 13px; font-weight: 600; cursor: pointer; background: none; color: var(--muted); min-height: 32px; }
+.chip[aria-pressed="true"] { color: var(--bone); border-color: var(--muted); background: var(--panel-2); }
+.chip[aria-pressed="true"]::before { content: "✓"; color: var(--accent); }
+select { max-width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-height: 40px; }
+
+.readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); border-top: 1px solid var(--line); }
+.ro { padding: 12px 14px; border-right: 1px solid var(--line); min-width: 0; }
+.ro:last-child { border-right: 0; }
+.ro .k { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .04em; }
+.ro .v { font: 600 21px/1.25 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ro .v small { font-size: 13px; color: var(--muted); margin-left: 3px; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 14px; border: 1.5px solid currentColor; white-space: nowrap; }
+.pill.success { color: var(--good); } .pill.undershoot, .pill.no-landing, .pill.invalid { color: var(--bad); } .pill.overshoot { color: var(--warn); } .pill.pending { color: var(--muted); }
+.diff { font: 700 11px/1 var(--f-body); letter-spacing: .1em; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.diff.beginner { color: var(--good); } .diff.intermediate { color: var(--vx); } .diff.advanced { color: var(--warn); } .diff.expert { color: var(--bad); }
+
+/* ---------- controls ---------- */
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.ctl:first-of-type { border-top: 0; padding-top: 0; }
+.ctl label { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.ctl label .sym { font-family: var(--f-mono); color: var(--muted); font-size: 13px; }
+.ctl .numwrap { display: flex; align-items: center; gap: 4px; }
+.ctl input[type="number"] { width: 78px; text-align: right; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.ctl input[type="number"]:disabled { opacity: .6; }
+.ctl .unit { color: var(--muted); font-size: 13px; min-width: 32px; }
+.ctl input[type="range"] { grid-column: 1 / -1; width: 100%; }
+.ctl .err { grid-column: 1 / -1; color: var(--bad); font-size: 13px; }
+.ctl.locked label::after { content: "Locked"; font: 700 10px/1 var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; }
+.lockico { width: 12px; height: 12px; }
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 32px; background: transparent; cursor: pointer; }
+input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill, 50%), var(--line) var(--fill, 50%)); }
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill, 50%), var(--line) var(--fill, 50%)); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%; background: var(--bone); border: 3px solid var(--night); box-shadow: 0 0 0 1.5px var(--accent); }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--bone); border: 3px solid var(--night); box-shadow: 0 0 0 1.5px var(--accent); }
+input[type="range"]:disabled { cursor: not-allowed; opacity: .4; }
+input[type="range"].scrub::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--muted) var(--fill, 0%), var(--line) var(--fill, 0%)); }
+input[type="range"].scrub::-moz-range-track { background: linear-gradient(to right, var(--muted) var(--fill, 0%), var(--line) var(--fill, 0%)); }
+
+/* ---------- activity panel ---------- */
+.mission h3 { margin: 6px 0 6px; font: 800 26px/1.05 var(--f-display); text-transform: uppercase; text-wrap: balance; }
+.mission p { margin: 0 0 10px; }
+.mission ul { margin: 0 0 12px; padding-left: 18px; }
+.mission li { margin: 2px 0; }
+.varchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.varchip { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--line); }
+.varchip.adj { border-color: var(--accent); color: var(--accent); }
+.varchip.fix { color: var(--muted); }
+.block { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; display: grid; gap: 8px; }
+.feedback { border-radius: 8px; padding: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.feedback.success { border-color: var(--good); }
+.feedback.fail { border-color: var(--bad); }
+.feedback.near { border-color: var(--warn); }
+.feedback strong { display: block; font: 800 20px/1.1 var(--f-display); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.hint { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; border: 1px dashed var(--line); }
+.hint b { color: var(--accent); font-family: var(--f-mono); font-size: 12px; margin-right: 6px; }
+ol.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.challenge-list { display: grid; gap: 8px; }
+.cl-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; width: 100%; }
+.cl-item:hover { border-color: var(--muted); }
+.cl-item[aria-current="true"] { border-color: var(--accent); }
+.cl-item .n { font: 800 22px/1 var(--f-display); color: var(--accent); width: 22px; }
+.cl-item .t { font-weight: 700; }
+.cl-item .s { font-size: 12px; color: var(--muted); }
+.done { color: var(--good); font-weight: 700; font-size: 13px; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.opts { display: grid; gap: 6px; }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 9px 12px; cursor: pointer; min-height: 40px; }
+.opt:hover:not(:disabled) { border-color: var(--muted); }
+.opt[aria-pressed="true"] { border-color: var(--accent); }
+.opt.correct { border-color: var(--good); }
+.opt.correct::after { content: "  ✓ actual result"; color: var(--good); font-weight: 700; font-size: 13px; }
+.opt.wrong::after { content: "  ✕ your pick"; color: var(--bad); font-weight: 700; font-size: 13px; }
+.opt:disabled { cursor: default; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.answer-in { display: flex; gap: 8px; align-items: center; }
+.answer-in input { width: 110px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: var(--f-mono); }
+table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.cmp th, table.cmp td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+table.cmp th:first-child, table.cmp td:first-child { text-align: left; color: var(--muted); font-weight: 500; }
+table.cmp td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.swatch { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; }
+
+/* ---------- tutor ---------- */
+.tutor { border-color: var(--accent); }
+.tutor h2 .tag { font: 700 10px/1 var(--f-body); letter-spacing: .12em; background: var(--accent); color: var(--accent-ink); padding: 4px 6px; border-radius: 4px; }
+.locks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.locks .btn { justify-content: flex-start; }
+.tutor .sub { font-weight: 700; font-size: 13px; color: var(--muted); margin: 14px 0 6px; letter-spacing: .04em; }
+
+/* ---------- workbench ---------- */
+.wb-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
+.wb-head h2 { margin: 0; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 14px 0 12px; border-bottom: 1px solid var(--line); }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer; color: var(--muted); font-weight: 600; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--bone); border-bottom-color: var(--accent); }
+.eqgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.eq { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.eq .name { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.eq .f { font: 600 18px/1.4 var(--f-mono); margin: 4px 0; overflow-x: auto; }
+.eq .d { font-size: 14px; color: var(--muted); }
+.defs { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; margin-top: 12px; }
+.defs dt { font-family: var(--f-mono); color: var(--accent); }
+.defs dd { margin: 0; }
+.work { display: grid; gap: 10px; counter-reset: step; }
+.work .stp { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; }
+.work .stp::before { counter-increment: step; content: counter(step); font: 800 20px/1.3 var(--f-display); color: var(--accent); }
+.work .what { font-size: 14px; color: var(--muted); }
+.work .math { font: 500 15px/1.6 var(--f-mono); overflow-x: auto; white-space: nowrap; }
+.work .math b { color: var(--accent); font-weight: 600; }
+.concepts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.concept { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; text-align: left; cursor: pointer; }
+.concept h4 { margin: 0 0 4px; font: 700 16px/1.2 var(--f-body); }
+.concept p { margin: 0; color: var(--muted); font-size: 14px; }
+.concept[aria-expanded="false"] p { display: none; }
+.hidden-note { color: var(--muted); font-style: italic; padding: 8px 0; }
+
+/* ---------- dialog ---------- */
+.modal { position: fixed; inset: 0; background: color-mix(in srgb, var(--night) 80%, transparent); display: grid; place-items: center; padding: 16px; z-index: 50; }
+.modal .panel { width: min(560px, 100%); max-height: 90vh; overflow: auto; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.stat { background: var(--panel-2); border-radius: 8px; padding: 10px; }
+.stat .v { font: 600 22px/1.2 var(--f-mono); }
+.stat .k { font-size: 12px; color: var(--muted); }
+@media (max-width: 520px) {
+  .brand h1 { font-size: 28px; }
+  .topbar { gap: 8px; }
+  .topbar .seg button { padding: 6px 10px; font-size: 13px; }
+  .topbar .btn { min-height: 36px; padding: 6px 10px; font-size: 13px; }
+  .transport .btn.primary { flex: 1 1 100%; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ro .v { font-size: 18px; }
+  .locks { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- SVG scene ---------- */
+#scene .sky-top { stop-color: var(--sky-top); } #scene .sky-bot { stop-color: var(--sky-bot); }
+#scene .grid { stroke: var(--line); stroke-width: 1; }
+#scene .axis { stroke: var(--faint); stroke-width: 1.5; }
+#scene .tick { fill: var(--faint); font: 400 12px var(--f-mono); }
+#scene .axlbl { fill: var(--muted); font: 600 13px var(--f-mono); }
+#scene .dirt { fill: var(--dirt); }
+#scene .gap { fill: var(--dirt-lo); }
+#scene .edge { stroke: var(--dirt-hi); stroke-width: 3; fill: none; stroke-linejoin: round; }
+#scene .zone { fill: var(--good); fill-opacity: .22; stroke: var(--good); stroke-width: 2; }
+#scene .zlbl { fill: var(--good); font: 700 12px var(--f-body); letter-spacing: .12em; }
+#scene .tgt { stroke: var(--good); stroke-width: 2; }
+#scene .pred { stroke: var(--bone); stroke-width: 2; stroke-dasharray: 6 7; fill: none; opacity: .8; }
+#scene .flown { stroke: var(--accent); stroke-width: 3.5; fill: none; stroke-linecap: round; }
+#scene .ghost { stroke: var(--muted); stroke-width: 1.5; fill: none; opacity: .4; }
+#scene .cmpA { stroke: var(--cmpA); stroke-width: 2.5; stroke-dasharray: 12 5; fill: none; }
+#scene .cmpB { stroke: var(--cmpB); stroke-width: 2.5; stroke-dasharray: 3 5; fill: none; stroke-linecap: round; }
+#scene .cmpAt { fill: var(--cmpA); } #scene .cmpBt { fill: var(--cmpB); }
+#scene .dim { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+#scene .dimdash { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; fill: none; }
+#scene .lbl { fill: var(--bone); font: 600 13px var(--f-mono); paint-order: stroke; stroke: var(--night); stroke-width: 4px; stroke-linejoin: round; }
+#scene .lbl.big { font-size: 15px; }
+#scene .muted { fill: var(--muted); }
+#scene .rider { stroke: var(--bone); stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+#scene .rider .head { fill: var(--bone); stroke: none; }
+#scene .vec { stroke-width: 3; fill: none; }
+#scene .vv { stroke: var(--accent); } #scene .vx { stroke: var(--vx); } #scene .vy { stroke: var(--vy); }
+#scene .mv { fill: var(--accent); } #scene .mx { fill: var(--vx); } #scene .my { fill: var(--vy); }
+#scene .tv { fill: var(--accent); } #scene .tx { fill: var(--vx); } #scene .ty { fill: var(--vy); }
+#scene .ok { fill: var(--good); } #scene .bad { fill: var(--bad); } #scene .warn { fill: var(--warn); }
+#scene .okS { stroke: var(--good); } #scene .badS { stroke: var(--bad); } #scene .warnS { stroke: var(--warn); }
+#scene .annot { fill: var(--accent); font: 500 14px var(--f-mono); paint-order: stroke; stroke: var(--night); stroke-width: 4px; }
+#scene .apexdot { fill: var(--bone); }
+</style>
+</head>
+<body>
+
+
+<header class="topbar">
+  <div class="brand"><small>Mathlete MTB</small><h1>Jump <span>Lab</span></h1></div>
+  <div class="seg" role="tablist" aria-label="Activity">
+    <button role="tab" id="tabExplore" aria-selected="true">Explore</button>
+    <button role="tab" id="tabChallenge" aria-selected="false">Challenges</button>
+  </div>
+  <div class="seg" aria-label="Units">
+    <button id="uImp" aria-pressed="true">ft · mph</button>
+    <button id="uMet" aria-pressed="false">m · km/h</button>
+  </div>
+  <button class="btn" id="tutorBtn" aria-pressed="false">Tutor mode</button>
+  <button class="btn ghost" id="sessionBtn">Session</button>
+</header>
+
+<main class="layout">
+  <div class="main-col">
+    <section class="stage" aria-label="Jump simulation">
+      <div class="canvas-wrap">
+        <svg id="scene" role="img" aria-labelledby="sceneDesc" xmlns="http://www.w3.org/2000/svg"><desc id="sceneDesc">Side view of the jump</desc></svg>
+        <div id="overlay" class="overlay" hidden></div>
+      </div>
+      <div class="transport">
+        <button class="btn primary" id="sendBtn">Send it</button>
+        <button class="btn" id="playBtn" aria-label="Play">▶ Play</button>
+        <button class="btn" id="resetBtn">↺ Reset</button>
+        <label for="rate">Speed</label>
+        <select id="rate"><option value="1">1×</option><option value="0.5">½×</option><option value="0.25">¼×</option><option value="0.1">0.1×</option></select>
+        <div class="grow"><label for="scrub" class="num" id="tLabel">t = 0.00 s</label><input type="range" id="scrub" class="scrub" min="0" max="1000" value="0" step="1" style="flex:1;min-width:0"></div>
+      </div>
+      <div class="toggles" id="toggles" aria-label="Display options"></div>
+      <div class="readouts" id="readouts" aria-live="off"></div>
+    </section>
+
+    <section class="panel" id="workbench" aria-labelledby="wbTitle">
+      <div class="wb-head">
+        <h2 id="wbTitle">Math Workbench</h2>
+        <div class="row">
+          <div class="seg" aria-label="Explanation level"><button id="lvlSimple" aria-pressed="true">Simple</button><button id="lvlAdv" aria-pressed="false">Advanced</button></div>
+          <button class="btn small" id="wbToggle" aria-expanded="true" aria-controls="wbBody">Collapse</button>
+        </div>
+      </div>
+      <div id="wbBody">
+        <div class="tabs" role="tablist">
+          <button role="tab" data-tab="eq" aria-selected="true">Equations</button>
+          <button role="tab" data-tab="sub" aria-selected="false">Plug in the numbers</button>
+          <button role="tab" data-tab="concepts" aria-selected="false">Concepts</button>
+        </div>
+        <div id="wbContent"></div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="side">
+    <section class="panel tutor" id="tutorPanel" hidden aria-label="Tutor controls"></section>
+    <section class="panel" id="controlsPanel" aria-labelledby="ctlTitle">
+      <h2 id="ctlTitle">Jump Setup</h2>
+      <div id="controls"></div>
+    </section>
+    <section class="panel" id="activityPanel"></section>
+  </aside>
+</main>
+
+<div id="modal" class="modal" hidden></div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+
+<script>
+'use strict';
+const __units = (() => {
+
+/**
+ * Jump Lab — Unit system
+ * Physics is always SI. These helpers convert at the UI boundary only.
+ */
+
+const MPH_TO_MS = 0.44704; // exact
+const KMH_TO_MS = 1 / 3.6;
+const FT_TO_M = 0.3048; // exact
+
+const UNIT_SYSTEMS = Object.freeze({
+  imperial: { speed: 'mph', length: 'ft', g: 'ft/s²', velocity: 'ft/s' },
+  metric: { speed: 'km/h', length: 'm', g: 'm/s²', velocity: 'm/s' },
+});
+
+const mphToMs = (v) => v * MPH_TO_MS;
+const msToMph = (v) => v / MPH_TO_MS;
+const kmhToMs = (v) => v * KMH_TO_MS;
+const msToKmh = (v) => v / KMH_TO_MS;
+const ftToM = (d) => d * FT_TO_M;
+const mToFt = (d) => d / FT_TO_M;
+
+/** Display speed (mph or km/h) → m/s */
+function speedToSI(v, system) {
+  return system === 'metric' ? kmhToMs(v) : mphToMs(v);
+}
+function speedFromSI(v, system) {
+  return system === 'metric' ? msToKmh(v) : msToMph(v);
+}
+/** Display length (ft or m) → m */
+function lengthToSI(d, system) {
+  return system === 'metric' ? d : ftToM(d);
+}
+function lengthFromSI(d, system) {
+  return system === 'metric' ? d : mToFt(d);
+}
+/** Velocity (m/s) → ft/s or m/s — used in the workbench where equations need consistent units */
+function velocityFromSI(v, system) {
+  return system === 'metric' ? v : mToFt(v);
+}
+function gFromSI(g, system) {
+  return system === 'metric' ? g : mToFt(g);
+}
+
+return { MPH_TO_MS, KMH_TO_MS, FT_TO_M, UNIT_SYSTEMS, mphToMs, msToMph, kmhToMs, msToKmh, ftToM, mToFt, speedToSI, speedFromSI, lengthToSI, lengthFromSI, velocityFromSI, gFromSI };
+})();
+
+const __physics = (() => {
+
+/**
+ * Jump Lab — Physics Engine
+ * --------------------------------------------------------------
+ * Pure, deterministic 2D projectile-motion model. No DOM, no state.
+ * All functions take and return SI units (m, s, m/s, radians unless
+ * a name ends in "Deg"). Unit conversion lives in units.js.
+ *
+ * Model assumptions (PRD §5.1): constant g, no drag, no lift,
+ * rider is a point mass, no in-flight input.
+ */
+
+const G = 9.80665; // standard gravity, m/s²
+const EPS = 1e-9;
+
+const degToRad = (d) => (d * Math.PI) / 180;
+const radToDeg = (r) => (r * 180) / Math.PI;
+
+const isNum = (n) => typeof n === 'number' && Number.isFinite(n);
+
+/**
+ * Validate a jump configuration. Returns a list of human-readable
+ * problems; empty list means the config is usable.
+ */
+function validateConfig(cfg) {
+  const errors = [];
+  const fields = ['v0', 'angleDeg', 'y0', 'yL'];
+  for (const f of fields) if (!isNum(cfg[f])) errors.push(`${f} must be a finite number`);
+  if (isNum(cfg.v0) && cfg.v0 < 0) errors.push('Speed cannot be negative');
+  if (isNum(cfg.angleDeg) && (cfg.angleDeg <= -90 || cfg.angleDeg >= 90))
+    errors.push('Launch angle must be between -90° and 90°');
+  if (cfg.g !== undefined && (!isNum(cfg.g) || cfg.g <= 0)) errors.push('Gravity must be positive');
+  return errors;
+}
+
+/** Velocity components at launch: vₓ = v₀cosθ, vᵧ = v₀sinθ */
+function components(v0, angleDeg) {
+  const th = degToRad(angleDeg);
+  return { vx: v0 * Math.cos(th), vy: v0 * Math.sin(th) };
+}
+
+/** x(t), y(t) */
+function positionAt(cfg, t) {
+  const g = cfg.g ?? G;
+  const { vx, vy } = components(cfg.v0, cfg.angleDeg);
+  return { x: vx * t, y: cfg.y0 + vy * t - 0.5 * g * t * t };
+}
+
+/** vₓ(t) = v₀cosθ (constant), vᵧ(t) = v₀sinθ − gt */
+function velocityAt(cfg, t) {
+  const g = cfg.g ?? G;
+  const { vx, vy } = components(cfg.v0, cfg.angleDeg);
+  const vyt = vy - g * t;
+  return { vx, vy: vyt, speed: Math.hypot(vx, vyt) };
+}
+
+/** Apex of the trajectory. If launched level/downward, apex is the lip. */
+function apex(cfg) {
+  const g = cfg.g ?? G;
+  const { vx, vy } = components(cfg.v0, cfg.angleDeg);
+  if (vy <= 0) return { t: 0, x: 0, y: cfg.y0 };
+  const t = vy / g;
+  return { t, x: vx * t, y: cfg.y0 + (vy * vy) / (2 * g) };
+}
+
+/**
+ * Time when the rider reaches elevation yL on the DESCENDING part of
+ * the path (PRD §5.3):
+ *   t_L = [v₀sinθ + √((v₀sinθ)² + 2g(y₀ − y_L))] / g
+ * Returns null when the trajectory never reaches yL while descending.
+ */
+function landingTime(cfg) {
+  const g = cfg.g ?? G;
+  const { vy } = components(cfg.v0, cfg.angleDeg);
+  const disc = vy * vy + 2 * g * (cfg.y0 - cfg.yL);
+  if (disc < -EPS) return null; // landing surface is above the apex
+  const t = (vy + Math.sqrt(Math.max(0, disc))) / g;
+  if (!(t > EPS)) return null; // only reached at/before launch
+  // Must be descending (or at apex) when it gets there
+  if (vy - g * t > EPS) return null;
+  return t;
+}
+
+/** Landing time, position, velocity and impact angle, or null. */
+function landing(cfg) {
+  const t = landingTime(cfg);
+  if (t === null) return null;
+  const p = positionAt(cfg, t);
+  const v = velocityAt(cfg, t);
+  return {
+    t,
+    x: p.x,
+    y: cfg.yL,
+    vx: v.vx,
+    vy: v.vy,
+    speed: v.speed,
+    impactAngleDeg: radToDeg(Math.atan2(-v.vy, v.vx)), // degrees below horizontal
+  };
+}
+
+const RESULT = Object.freeze({
+  UNDERSHOOT: 'undershoot',
+  SUCCESS: 'success',
+  OVERSHOOT: 'overshoot',
+  NO_LANDING: 'no-landing',
+  INVALID: 'invalid',
+});
+
+/**
+ * Landing zone = [targetX − width/2, targetX + width/2].
+ * The landing platform starts at the zone's near edge (the gap ends there).
+ */
+function zoneBounds(zone) {
+  return { start: zone.targetX - zone.width / 2, end: zone.targetX + zone.width / 2 };
+}
+
+function classifyLanding(xL, zone) {
+  if (xL === null || xL === undefined || !isNum(xL)) return RESULT.NO_LANDING;
+  const { start, end } = zoneBounds(zone);
+  if (xL < start - EPS) return RESULT.UNDERSHOOT;
+  if (xL > end + EPS) return RESULT.OVERSHOOT;
+  return RESULT.SUCCESS;
+}
+
+/**
+ * Full simulation summary. Never throws — invalid input produces
+ * { status: 'invalid', errors }.
+ */
+function simulate(cfg, zone) {
+  const errors = validateConfig(cfg);
+  if (errors.length) return { status: RESULT.INVALID, errors };
+  const { vx, vy } = components(cfg.v0, cfg.angleDeg);
+  const top = apex(cfg);
+  const land = landing(cfg);
+  let status = zone ? classifyLanding(land ? land.x : null, zone) : land ? null : RESULT.NO_LANDING;
+  // The landing deck is a solid block starting at the zone's near edge. If the
+  // rider is still below deck height when reaching that edge, they hit its face.
+  const hitsFace = !!(zone && land && status !== RESULT.UNDERSHOOT && strikesFace(cfg, zone));
+  if (hitsFace) status = RESULT.UNDERSHOOT;
+  let miss = null;
+  if (zone && land) {
+    const { start, end } = zoneBounds(zone);
+    miss = land.x < start ? land.x - start : land.x > end ? land.x - end : 0;
+  }
+  return { status, errors: [], vx, vy, apex: top, landing: land, miss, hitsFace, targetError: zone && land ? land.x - zone.targetX : null };
+}
+
+/** True if the rider is below the deck top (yL) when x reaches the deck edge. */
+function strikesFace(cfg, zone) {
+  const { start } = zoneBounds(zone);
+  const { vx } = components(cfg.v0, cfg.angleDeg);
+  if (!(start > 0) || !(vx > EPS)) return false;
+  return positionAt(cfg, start / vx).y < cfg.yL - 1e-6;
+}
+
+/**
+ * Sample the path for drawing. Stops at landing, or at tMax if the
+ * rider never lands (so the renderer can still show the arc).
+ */
+function samplePath(cfg, n = 120, tMaxFallback = 3) {
+  const land = landingTime(cfg);
+  const tEnd = land ?? tMaxFallback;
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const t = (tEnd * i) / n;
+    const p = positionAt(cfg, t);
+    pts.push({ t, x: p.x, y: p.y });
+  }
+  return { points: pts, tEnd, landed: land !== null };
+}
+
+/* ---------- Inverse solvers (used for worked solutions & checks) ---------- */
+
+/**
+ * Minimum launch speed so the path passes through (x, yL) at angle θ:
+ *   yL = y₀ + x·tanθ − g·x² / (2v²cos²θ)
+ *   ⇒ v = √( g·x² / (2cos²θ·(y₀ − yL + x·tanθ)) )
+ * Returns null if no speed works (denominator ≤ 0).
+ */
+function speedForDistance(x, angleDeg, y0, yL, g = G) {
+  const th = degToRad(angleDeg);
+  const c = Math.cos(th);
+  const denom = 2 * c * c * (y0 - yL + x * Math.tan(th));
+  if (!(x > 0) || denom <= EPS) return null;
+  return Math.sqrt((g * x * x) / denom);
+}
+
+/**
+ * All launch angles (within [minDeg, maxDeg]) that land exactly at x.
+ * Closed form via tan θ quadratic:
+ *   (g x²/2v²)·T² − x·T + (g x²/2v² − (y₀ − yL)) = 0, T = tanθ
+ */
+function anglesForDistance(x, v0, y0, yL, g = G, minDeg = -89, maxDeg = 89) {
+  if (!(x > 0) || !(v0 > 0)) return [];
+  const k = (g * x * x) / (2 * v0 * v0);
+  const a = k, b = -x, c = k - (y0 - yL);
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return [];
+  const roots = [(-b - Math.sqrt(disc)) / (2 * a), (-b + Math.sqrt(disc)) / (2 * a)];
+  const out = [];
+  for (const T of roots) {
+    const d = radToDeg(Math.atan(T));
+    if (d >= minDeg - EPS && d <= maxDeg + EPS && landingTime({ v0, angleDeg: d, y0, yL, g }) !== null) {
+      if (!out.some((o) => Math.abs(o - d) < 1e-6)) out.push(d);
+    }
+  }
+  return out.sort((p, q) => p - q);
+}
+
+return { G, degToRad, radToDeg, validateConfig, components, positionAt, velocityAt, apex, landingTime, landing, RESULT, zoneBounds, classifyLanding, simulate, strikesFace, samplePath, speedForDistance, anglesForDistance };
+})();
+
+const __challenges = (() => {
+
+/**
+ * Jump Lab — Challenge & prediction content (data only)
+ * --------------------------------------------------------------
+ * Authors can add missions here without touching the engine.
+ * All authored values are IMPERIAL (mph, ft, degrees); the app
+ * converts to SI before calling the physics engine.
+ *
+ * Schema
+ *   id, title, difficulty ('beginner'|'intermediate'|'advanced'|'expert')
+ *   type: 'zone' (land in zone) | 'min-speed' | 'two-jumps' | 'calculate'
+ *   description, objectives[], concepts[]
+ *   fixed:      variables locked for this mission
+ *   initial:    starting values for adjustable variables
+ *   adjustable: which controls the student can move
+ *   ranges:     optional per-mission slider ranges
+ *   zone:       { targetX, width } landing zone (ft)
+ *   success:    rule params interpreted by the challenge engine
+ *   prediction: optional question asked before the first jump
+ *   hints[]:    progressive, each reveals more of the method
+ *   solution[]: worked-solution steps (shown after ≥1 attempt)
+ *   explanation: the principle, in rider language
+ *   referenceSolutions[]: known-good answers (verified by unit tests)
+ */
+
+const CHALLENGES = [
+  {
+    id: 'clear-the-gap',
+    title: 'Clear the Gap',
+    difficulty: 'beginner',
+    type: 'zone',
+    description:
+      'A trail builder has a double with a fixed run-in: you’ll hit the lip at exactly 18 mph. The landing deck sits 2 ft below the lip. Pick a lip angle that puts the rider on the sweet spot of the landing.',
+    objectives: ['Land inside the green zone (18–22 ft).', 'Notice how angle changes height and distance.'],
+    concepts: ['variables', 'reading-graphs', 'angle'],
+    fixed: { speed: 18, takeoffElev: 0, landingElev: -2 },
+    initial: { angle: 10 },
+    adjustable: ['angle'],
+    zone: { targetX: 20, width: 4 },
+    success: {},
+    prediction: {
+      prompt: 'At 10° you’ll come up short. What should you do to the lip angle?',
+      options: ['Make it steeper', 'Make it flatter', 'Angle doesn’t matter, only speed'],
+      answer: 0,
+      why: 'Steeper sends more of your speed upward, so you stay in the air longer — and longer airtime at this speed means more distance (until about 45°).',
+    },
+    hints: [
+      'Which variable can you change? Everything else is locked. Try a few angles and watch where the landing marker moves.',
+      'Steeper angle → more vertical velocity (vᵧ = v₀ sin θ) → more airtime.',
+      'More airtime × horizontal speed (vₓ = v₀ cos θ) = more distance. Try somewhere in the mid-20s.',
+    ],
+    solution: [
+      'Convert speed: 18 mph × 5280/3600 = 26.4 ft/s. Use g = 32.17 ft/s².',
+      'Try θ = 25°: vₓ = 26.4·cos 25° = 23.93 ft/s, vᵧ = 26.4·sin 25° = 11.16 ft/s.',
+      'Landing time: t = [11.16 + √(11.16² + 2·32.17·(0 − (−2)))] / 32.17 = (11.16 + 15.91)/32.17 = 0.841 s.',
+      'Distance: x = 23.93 × 0.841 = 20.1 ft → right in the 18–22 ft zone. ✓',
+      'Any angle from about 20° to 30° works at this speed.',
+    ],
+    explanation:
+      'Angle splits your speed into two jobs: forward (cos θ) and up (sin θ). Steeper gives you more hang time but less forward speed. Below ~45° the extra hang time wins, so steeper goes farther.',
+    referenceSolutions: [{ angle: 25 }, { angle: 21 }, { angle: 29 }],
+  },
+  {
+    id: 'minimum-speed',
+    title: 'Minimum Speed',
+    difficulty: 'intermediate',
+    type: 'min-speed',
+    description:
+      'An 18° lip, 2 ft above the landing. The landing deck starts 24 ft out. Riders want to know the slowest speed that still clears the gap — so they don’t have to pin it. Find it.',
+    objectives: ['Land on the deck (24–32 ft).', 'Land within 1.5 ft of the deck edge — that’s the minimum speed.'],
+    concepts: ['substitution', 'solving-for-unknowns', 'quadratics'],
+    fixed: { angle: 18, takeoffElev: 2, landingElev: 0 },
+    initial: { speed: 15 },
+    adjustable: ['speed'],
+    ranges: { speed: [10, 35, 0.1] },
+    zone: { targetX: 28, width: 8 },
+    success: { maxPastStart: 1.5 },
+    prediction: {
+      prompt: 'If you double your speed, roughly what happens to your jump distance?',
+      options: ['About the same', 'About double', 'Much more than double', 'Less than double'],
+      answer: 2,
+      why: 'Faster means more forward speed AND more airtime — two effects multiply. On flat ground distance grows with v², so double speed ≈ 4× distance.',
+    },
+    hints: [
+      'Slide speed until you just reach the deck edge at 24 ft. Then try to calculate it instead of guessing.',
+      'Eliminate time: from x = v cosθ·t, t = x/(v cosθ). Substitute that into the y equation.',
+      'You get yL = y₀ + x tanθ − g x² / (2v² cos²θ). Everything is known except v.',
+      'Solve for v: v = √( g x² / (2 cos²θ · (y₀ − yL + x tanθ)) ).',
+    ],
+    solution: [
+      'Known: x = 24 ft, θ = 18°, y₀ = 2 ft, yL = 0 ft, g = 32.17 ft/s².',
+      'tan 18° = 0.3249, cos² 18° = 0.9045.',
+      'Denominator: 2 × 0.9045 × (2 − 0 + 24 × 0.3249) = 2 × 0.9045 × 9.798 = 17.72.',
+      'Numerator: g x² = 32.17 × 576 = 18,532.',
+      'v = √(18,532 / 17.72) = √1,045.6 = 32.33 ft/s.',
+      'Convert: 32.33 × 3600/5280 = 22.05 mph. Anything slower lands in the gap. ✓',
+    ],
+    explanation:
+      'This is “solving for an unknown”: the trajectory equation links speed to distance, so you can run it backwards. Eliminating time turns two equations into one parabola y(x) — the actual shape you see on screen.',
+    referenceSolutions: [{ speed: 22.1 }, { speed: 22.5 }],
+  },
+  {
+    id: 'perfect-trajectory',
+    title: 'The Perfect Trajectory',
+    difficulty: 'advanced',
+    type: 'zone',
+    description:
+      'Big step-down: lip 1 ft up, landing 3 ft below the datum. The sweet spot is a narrow 3 ft patch centered 32 ft out. You control both speed and angle. Stick it.',
+    objectives: ['Land within 30.5–33.5 ft.', 'Find a speed + angle pair — there is more than one.'],
+    concepts: ['trigonometry', 'vectors', 'quadratics'],
+    fixed: { takeoffElev: 1, landingElev: -3 },
+    initial: { speed: 18, angle: 15 },
+    adjustable: ['speed', 'angle'],
+    zone: { targetX: 32, width: 3 },
+    success: {},
+    hints: [
+      'Lock one variable in your head: pick a comfortable speed (say 22 mph) and adjust only angle.',
+      'Watch the drop: landing is 4 ft below the lip, so y₀ − yL = 4 ft adds airtime.',
+      'Use the Math Workbench “Substitute” tab to check your numbers before you jump.',
+    ],
+    solution: [
+      'Choose v₀ = 22 mph = 32.27 ft/s and try θ = 26°.',
+      'vₓ = 32.27 cos 26° = 29.00 ft/s, vᵧ = 32.27 sin 26° = 14.14 ft/s.',
+      't = [14.14 + √(14.14² + 2·32.17·(1 − (−3)))] / 32.17 = (14.14 + 21.39)/32.17 = 1.104 s.',
+      'x = 29.00 × 1.104 = 32.0 ft → dead center. ✓',
+      'Other answers exist, e.g. faster with a flatter lip. Every solution is a point on a curve in (speed, angle) space.',
+    ],
+    explanation:
+      'Two inputs, one output: many (speed, angle) pairs give the same landing. That’s why real jump builders talk about “speed windows” — a lip shape works over a range of speeds.',
+    referenceSolutions: [{ speed: 22, angle: 26 }, { speed: 25, angle: 17 }],
+  },
+  {
+    id: 'same-distance',
+    title: 'Same Distance, Different Jumps',
+    difficulty: 'advanced',
+    type: 'two-jumps',
+    description:
+      'Flat-to-flat, target 24 ft. Land it twice with launch angles at least 8° apart. Compare the two arcs: same distance, totally different feel.',
+    objectives: ['Land in the zone (22.5–25.5 ft) twice.', 'The two angles must differ by ≥ 8°.', 'Compare airtime and max height.'],
+    concepts: ['parabolas', 'optimization', 'comparison'],
+    fixed: { takeoffElev: 0, landingElev: 0 },
+    initial: { speed: 18, angle: 12 },
+    adjustable: ['speed', 'angle'],
+    zone: { targetX: 24, width: 3 },
+    success: { minAngleDiff: 8 },
+    prediction: {
+      prompt: 'Two jumps land at the same spot. Which one has more airtime?',
+      options: ['The steeper one', 'The flatter one', 'Same airtime'],
+      answer: 0,
+      why: 'The steeper jump goes higher, and time in the air depends on vertical speed. The flatter jump makes up the distance with more forward speed.',
+    },
+    hints: [
+      'Start steep (around 30°+) and find the speed that lands it. Save that as Jump A.',
+      'Now go flatter (around 20°). You’ll need MORE speed to cover the same ground.',
+      'Use Compare to put both side by side. Look at flight time and max height.',
+    ],
+    solution: [
+      'Jump 1: 20 mph at 33° → vₓ = 24.60, vᵧ = 15.98 ft/s → t = 2·15.98/32.17 = 0.993 s → x = 24.4 ft. ✓',
+      'Jump 2: 22 mph at 23° → vₓ = 29.70, vᵧ = 12.61 ft/s → t = 0.784 s → x = 23.3 ft. ✓',
+      'Same distance, but Jump 1 has 27% more airtime and peaks at 4.0 ft vs 2.5 ft.',
+      'On flat ground x = v² sin(2θ)/g — the trade-off between v and θ is visible right in the formula.',
+    ],
+    explanation:
+      'Range depends on v² and sin(2θ). You can trade speed for angle. Riders feel this: a steep, floaty jump vs. a flat, fast one can land in the same spot.',
+    referenceSolutions: [{ speed: 20, angle: 33 }, { speed: 22, angle: 23 }],
+  },
+  {
+    id: 'solve-before-jump',
+    title: 'Solve Before You Jump',
+    difficulty: 'expert',
+    type: 'calculate',
+    description:
+      'Everything is locked: 22 mph, 15° lip, takeoff 2 ft up, landing 1 ft below the datum. Calculate where you’ll land BEFORE you hit go. Within 1 ft counts.',
+    objectives: ['Calculate the landing distance by hand.', 'Enter it, then run the jump to check.'],
+    concepts: ['trigonometry', 'quadratics', 'substitution', 'projectile-motion'],
+    fixed: { speed: 22, angle: 15, takeoffElev: 2, landingElev: -1 },
+    initial: {},
+    adjustable: [],
+    zone: { targetX: 23.8, width: 2 },
+    hideZoneUntilAnswered: true,
+    success: { tolerance: 1 },
+    hints: [
+      'Which equation describes horizontal position? x(t) = v₀ cos θ · t. You need t.',
+      'Velocity components: convert 22 mph to ft/s first, then vₓ = v₀ cos θ, vᵧ = v₀ sin θ.',
+      'Landing time comes from y(t) = yL — a quadratic in t. Use the + root: t = [vᵧ + √(vᵧ² + 2g(y₀ − yL))] / g.',
+      'Substitute that t into x = vₓ · t.',
+    ],
+    solution: [
+      'v₀ = 22 mph × 5280/3600 = 32.27 ft/s.',
+      'vₓ = 32.27 cos 15° = 31.17 ft/s, vᵧ = 32.27 sin 15° = 8.35 ft/s.',
+      'Drop: y₀ − yL = 2 − (−1) = 3 ft, so 2g·3 = 193.0.',
+      't = [8.35 + √(69.74 + 193.0)] / 32.17 = (8.35 + 16.21)/32.17 = 0.763 s.',
+      'x = 31.17 × 0.763 = 23.8 ft. ✓',
+    ],
+    explanation:
+      'This is the whole model in one problem: decompose the velocity (trig), solve the quadratic for time, substitute back. If you can do this, you can predict any jump in the lab.',
+    referenceSolutions: [{}],
+  },
+];
+
+/**
+ * Explore-mode prediction prompts (PRD §7.1).
+ * `apply` changes the current setup; `options[i].test(ratio)` checks the
+ * actual after/before ratio of `measure` to mark the correct option.
+ */
+const pct = (lo, hi) => (r) => r - 1 >= lo && r - 1 < hi;
+const PREDICTIONS = [
+  {
+    id: 'speed-plus-20',
+    prompt: 'If we increase takeoff speed by 20%, what happens to the jump distance?',
+    measure: 'distance',
+    apply: (s) => ({ ...s, speed: +(s.speed * 1.2).toFixed(1) }),
+    options: [
+      { label: 'Increase by less than 20%', test: pct(0.02, 0.17) },
+      { label: 'Increase by about 20%', test: pct(0.17, 0.23) },
+      { label: 'Increase by more than 20%', test: pct(0.23, 99) },
+      { label: 'Stay about the same', test: pct(-0.02, 0.02) },
+    ],
+    why: 'More speed gives more forward velocity AND more airtime. Those multiply, so distance grows faster than speed (≈ v² on flat ground).',
+  },
+  {
+    id: 'double-speed',
+    prompt: 'What happens to max height if we double the speed (same angle)?',
+    measure: 'height',
+    apply: (s) => ({ ...s, speed: +(s.speed * 2).toFixed(1) }),
+    options: [
+      { label: 'About double', test: pct(0.7, 1.5) },
+      { label: 'About 4× as high', test: pct(1.5, 99) },
+      { label: 'Stays the same', test: pct(-0.05, 0.05) },
+    ],
+    why: 'Height above the lip is vᵧ²/2g. Double v₀ → double vᵧ → 4× the rise.',
+    note: 'Measured as height gained above the lip.',
+  },
+  {
+    id: 'angle-up-5',
+    prompt: 'Keep speed the same and raise the angle by 5°. Distance will…',
+    measure: 'distance',
+    apply: (s) => ({ ...s, angle: Math.min(s.angle + 5, 35) }),
+    options: [
+      { label: 'Increase', test: pct(0.01, 99) },
+      { label: 'Decrease', test: pct(-99, -0.01) },
+      { label: 'Barely change', test: pct(-0.01, 0.01) },
+    ],
+    why: 'Below ~45°, extra airtime beats the lost forward speed, so steeper usually goes farther. Near 45° the two effects balance.',
+  },
+  {
+    id: 'drop-landing',
+    prompt: 'Lower the landing by 3 ft (bigger step-down). What happens to airtime?',
+    measure: 'time',
+    apply: (s) => ({ ...s, landingElev: Math.max(s.landingElev - 3, -6) }),
+    options: [
+      { label: 'Longer airtime', test: pct(0.01, 99) },
+      { label: 'Shorter airtime', test: pct(-99, -0.01) },
+      { label: 'Same airtime', test: pct(-0.01, 0.01) },
+    ],
+    why: 'The rider falls farther before touching down. The curve is the same — you just see more of it.',
+  },
+];
+
+/** Short, rider-language concept explainers (PRD §7.4). */
+const CONCEPTS = {
+  parabola: {
+    title: 'Why the path is a parabola',
+    body: 'Gravity pulls you down the whole time, while your forward speed never changes. Steady forward + steadily faster falling = a curve called a parabola.',
+  },
+  components: {
+    title: 'Splitting speed with sin & cos',
+    body: 'Your speed points along the lip. cos θ tells you how much goes forward, sin θ how much goes up. Steep lip → more up, less forward.',
+  },
+  quadratic: {
+    title: 'Where the quadratic comes from',
+    body: 'Height y(t) has a t² term from gravity, so “when do I hit the deck?” is a quadratic. Two roots: the + root is when you come down.',
+  },
+  independence: {
+    title: 'Horizontal and vertical are independent',
+    body: 'Gravity only acts downward. Horizontal speed stays the same from lip to landing — check the vₓ arrow in slow-mo.',
+  },
+  variables: {
+    title: 'Inputs and outputs',
+    body: 'Speed, angle and elevations are independent variables — you choose them. Distance, airtime and height are dependent — the jump decides them.',
+  },
+};
+
+return { CHALLENGES, PREDICTIONS, CONCEPTS };
+})();
+
+const __app = (() => {
+const P = __physics;
+const U = __units;
+const { CHALLENGES, PREDICTIONS, CONCEPTS } = __challenges;
+/**
+ * Jump Lab — application layer
+ * Modules: state · units/format · controls · renderer · animation ·
+ * challenge engine · prediction · compare · workbench · tutor · session.
+ * The physics engine (physics.js) is the only source of numbers.
+ */
+
+
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const ft = U.ftToM;
+const DIFFS = ['beginner', 'intermediate', 'advanced', 'expert'];
+
+/* ======================= variables & units ======================= */
+const VARS = [
+  { key: 'speed', label: 'Takeoff speed', kind: 'speed', range: [10, 35, 0.5], sym: 'v₀' },
+  { key: 'angle', label: 'Launch angle', kind: 'angle', range: [5, 35, 0.5], sym: 'θ' },
+  { key: 'takeoffElev', label: 'Takeoff elevation', kind: 'length', range: [0, 10, 0.5], sym: 'y₀' },
+  { key: 'landingElev', label: 'Landing elevation', kind: 'length', range: [-6, 6, 0.5], sym: 'y_L' },
+  { key: 'targetX', label: 'Target distance', kind: 'length', range: [8, 40, 0.5], sym: 'x_T' },
+  { key: 'zoneWidth', label: 'Landing zone width', kind: 'length', range: [4, 12, 0.5], sym: 'w' },
+];
+const VAR = Object.fromEntries(VARS.map((v) => [v.key, v]));
+const EXPLORE_DEFAULTS = { speed: 20, angle: 20, takeoffElev: 0, landingElev: -2, targetX: 22, zoneWidth: 8 }; // imperial
+
+const impToSI = (kind, v) => (kind === 'speed' ? U.mphToMs(v) : kind === 'length' ? ft(v) : v);
+const toDisp = (kind, si) => (kind === 'speed' ? U.speedFromSI(si, S.units) : kind === 'length' ? U.lengthFromSI(si, S.units) : si);
+const fromDisp = (kind, d) => (kind === 'speed' ? U.speedToSI(d, S.units) : kind === 'length' ? U.lengthToSI(d, S.units) : d);
+const unitOf = (kind) => (kind === 'angle' ? '°' : U.UNIT_SYSTEMS[S.units][kind]);
+const met = () => S.units === 'metric';
+
+function dispRange(v) {
+  const c = currentChallenge();
+  const [lo, hi, st] = c?.ranges?.[v.key] ?? v.range;
+  if (!met() || v.kind === 'angle') return [lo, hi, st];
+  const step = v.kind === 'speed' ? (st < 0.5 ? 0.1 : 0.5) : 0.05;
+  const cv = (x) => toDisp(v.kind, impToSI(v.kind, x));
+  return [Math.ceil(cv(lo) / step - 1e-9) * step, Math.floor(cv(hi) / step + 1e-9) * step, step];
+}
+const dec = (kind) => (kind === 'length' && met() ? 2 : 1);
+const fmtL = (m, d) => `${U.lengthFromSI(m, S.units).toFixed(d ?? (met() ? 2 : 1))} ${unitOf('length')}`;
+const fmtS = (ms) => `${U.speedFromSI(ms, S.units).toFixed(1)} ${unitOf('speed')}`;
+const fmtV = (ms, d = 2) => `${U.velocityFromSI(ms, S.units).toFixed(d)} ${U.UNIT_SYSTEMS[S.units].velocity}`;
+const fmtT = (s, d = 2) => `${s.toFixed(d)} s`;
+const fmtA = (deg) => `${(+deg.toFixed(1))}°`;
+const signed = (m) => (m >= 0 ? '+' : '−') + fmtL(Math.abs(m));
+
+/* ============================ state ============================ */
+const S = {
+  units: 'imperial',
+  mode: 'explore',
+  tutor: false,
+  challengeId: CHALLENGES[0].id,
+  showList: true,
+  diffFilter: 'all',
+  vars: {},
+  exploreVars: null,
+  tutorLocks: {},
+  toggles: { path: true, grid: true, vectors: false, measure: true, annot: false },
+  anim: { t: 0, playing: false, rate: 1, endT: 0, counted: true },
+  flownKey: null,
+  compare: { A: null, B: null },
+  ghosts: [],
+  ch: {},
+  predict: null,
+  wbTab: 'eq', level: 'simple', wbOpen: true, defs: false, eqHidden: false,
+  blind: false, revealed: true,
+  discussQ: 0,
+  inputErr: {},
+  session: { start: Date.now(), started: new Set(), completed: new Set(), attempts: 0, hints: 0, predictions: 0, correct: 0, concepts: new Set(), jumps: 0 },
+};
+for (const k in EXPLORE_DEFAULTS) S.vars[k] = impToSI(VAR[k].kind, EXPLORE_DEFAULTS[k]);
+
+const currentChallenge = () => (S.mode === 'challenge' ? CHALLENGES.find((c) => c.id === S.challengeId) : null);
+const chState = (id) => (S.ch[id] ??= { attempts: 0, hints: 0, solved: false, jumps: [], answer: null, predicted: null, last: null, solution: false, started: false });
+const cfg = (v = S.vars) => ({ v0: v.speed, angleDeg: v.angle, y0: v.takeoffElev, yL: v.landingElev });
+const zone = (v = S.vars) => ({ targetX: v.targetX, width: v.zoneWidth });
+const key = () => JSON.stringify([S.vars]);
+
+function isLocked(k) {
+  if (k in S.tutorLocks) return S.tutorLocks[k];
+  const c = currentChallenge();
+  return c ? !c.adjustable.includes(k) : false;
+}
+
+/* ===================== scene geometry & flight ===================== */
+const RAMP_R = ft(12);
+function geometry(c, z) {
+  const th = P.degToRad(Math.max(c.angleDeg, 0.5));
+  const rampH = RAMP_R * (1 - Math.cos(th));
+  const rampLen = RAMP_R * Math.sin(th);
+  const { start, end } = P.zoneBounds(z);
+  const runY = c.y0 - rampH;
+  const floorY = Math.min(runY, c.yL) - ft(4);
+  return { rampH, rampLen, runY, deckStart: Math.max(start, ft(1.5)), zStart: start, zEnd: end, floorY };
+}
+
+/** When/where the visible flight ends: landing, deck face, or gap floor. */
+function flight(c, z, sim, g) {
+  if (sim.status === P.RESULT.INVALID) return { tEnd: 0, kind: 'invalid' };
+  if (sim.landing && (sim.status === P.RESULT.SUCCESS || sim.status === P.RESULT.OVERSHOOT)) return { tEnd: sim.landing.t, kind: 'deck' };
+  const vx = P.components(c.v0, c.angleDeg).vx;
+  const tFloor = P.landingTime({ ...c, yL: g.floorY }) ?? 3;
+  let tEnd = tFloor, kind = 'floor';
+  if (vx > 1e-9) {
+    const tf = g.deckStart / vx;
+    if (tf < tFloor && P.positionAt(c, tf).y < c.yL) { tEnd = tf; kind = 'face'; }
+  }
+  return { tEnd, kind };
+}
+
+/* ======================== result visibility ======================== */
+function hiddenByMission() {
+  const c = currentChallenge();
+  return !!(c && c.hideZoneUntilAnswered && chState(c.id).answer === null);
+}
+const flownCurrent = () => S.flownKey === key();
+function resultVisible() {
+  if (S.blind && !S.revealed) return false;
+  if (S.mode === 'challenge') return flownCurrent();
+  return true;
+}
+function pathVisible() {
+  if (S.blind && !S.revealed) return false;
+  if (hiddenByMission()) return false;
+  return S.toggles.path;
+}
+
+/* ============================ controls ============================ */
+function buildControls() {
+  const host = $('#controls');
+  host.innerHTML = VARS.map((v) => {
+    const [lo, hi, st] = dispRange(v);
+    const locked = isLocked(v.key);
+    return `<div class="ctl${locked ? ' locked' : ''}" data-k="${v.key}">
+      <label for="r_${v.key}">${esc(v.label)} <span class="sym">${v.sym}</span></label>
+      <div class="numwrap"><input type="number" id="n_${v.key}" aria-label="${esc(v.label)} (${unitOf(v.kind)})" min="${lo}" max="${hi}" step="${st}" ${locked ? 'disabled' : ''}><span class="unit">${unitOf(v.kind)}</span></div>
+      <input type="range" id="r_${v.key}" min="${lo}" max="${hi}" step="${st}" ${locked ? 'disabled' : ''} aria-describedby="e_${v.key}">
+      <div class="err" id="e_${v.key}" role="alert"></div>
+    </div>`;
+  }).join('');
+  for (const v of VARS) {
+    const r = $(`#r_${v.key}`), n = $(`#n_${v.key}`);
+    r.addEventListener('input', () => { setVar(v.key, fromDisp(v.kind, +r.value)); S.inputErr[v.key] = ''; syncControl(v.key, 'range'); });
+    n.addEventListener('change', () => {
+      const [lo, hi] = dispRange(v);
+      const raw = n.value.trim();
+      const x = Number(raw);
+      if (raw === '' || !Number.isFinite(x)) { S.inputErr[v.key] = `Enter a number from ${lo} to ${hi} ${unitOf(v.kind)}.`; syncControl(v.key); return; }
+      const cl = Math.min(hi, Math.max(lo, x));
+      S.inputErr[v.key] = cl !== x ? `${x} is out of range, so it was set to ${cl} ${unitOf(v.kind)}.` : '';
+      setVar(v.key, fromDisp(v.kind, cl));
+      syncControl(v.key);
+    });
+  }
+  syncControls();
+}
+function syncControl(k, from) {
+  const v = VAR[k];
+  const [lo, hi] = dispRange(v);
+  const d = toDisp(v.kind, S.vars[k]);
+  const r = $(`#r_${k}`), n = $(`#n_${k}`);
+  if (!r) return;
+  if (from !== 'range') r.value = d;
+  n.value = +d.toFixed(dec(v.kind) + (v.kind === 'speed' && dispRange(v)[2] < 0.5 ? 0 : 0));
+  r.style.setProperty('--fill', `${((d - lo) / (hi - lo)) * 100}%`);
+  $(`#e_${k}`).textContent = S.inputErr[k] || '';
+}
+const syncControls = () => VARS.forEach((v) => syncControl(v.key));
+
+function setVar(k, si) {
+  if (isLocked(k) || !Number.isFinite(si)) return;
+  S.vars[k] = si;
+  onSetupChanged();
+}
+function onSetupChanged() {
+  stopAnim();
+  S.anim.t = 0;
+  if (S.blind) S.revealed = false;
+  renderScene();
+  renderReadouts();
+  if (S.mode === 'explore') renderLiveFeedback();
+  if (S.wbTab === 'sub') renderWorkbench();
+}
+
+/* ============================ renderer ============================ */
+let VIEW = null;
+let staticKey = '';
+
+function viewport() {
+  const w = $('.canvas-wrap').clientWidth || 1000;
+  return w < 640 ? { W: 520, minH: 300, maxH: 460, small: true } : { W: 1000, minH: 380, maxH: 540, small: false };
+}
+
+function computeView(c, z, sim, g, extraXs) {
+  const { W, minH, maxH, small } = viewport();
+  const pad = { l: small ? 40 : 48, r: 12, t: 12, b: small ? 30 : 34 };
+  const xMin = -(Math.max(g.rampLen, ft(5)) + ft(4));
+  let xMax = Math.max(ft(30), g.zEnd + ft(6), ...(extraXs || []).map((x) => x + ft(4)));
+  if (sim.landing) xMax = Math.max(xMax, sim.landing.x + ft(5));
+  xMax = Math.ceil(xMax / ft(10)) * ft(10);
+  const yMin = g.floorY - ft(1);
+  let yMax = Math.max(ft(10), c.y0 + ft(4), c.yL + ft(4), (sim.apex?.y ?? 0) + ft(3));
+  yMax = Math.ceil(yMax / ft(5)) * ft(5);
+  const aw = W - pad.l - pad.r;
+  const H = Math.round(Math.min(maxH, Math.max(minH, ((yMax - yMin) * aw) / (xMax - xMin) + pad.t + pad.b)));
+  const ah = H - pad.t - pad.b;
+  const s = Math.min(aw / (xMax - xMin), ah / (yMax - yMin));
+  const v = { W, H, pad, s, xMin, yMin, xMax: xMin + aw / s, yMax: yMin + ah / s, small };
+  v.X = (x) => pad.l + (x - xMin) * s;
+  v.Y = (y) => pad.t + ah - (y - yMin) * s;
+  return v;
+}
+
+const pts = (v, arr) => arr.map((p) => `${v.X(p.x).toFixed(1)},${v.Y(p.y).toFixed(1)}`).join(' ');
+function pathPts(c, tEnd, n = 90) {
+  const out = [];
+  for (let i = 0; i <= n; i++) out.push(P.positionAt(c, (tEnd * i) / n));
+  return out;
+}
+
+function gridStep(span) {
+  if (met()) return span > 30 ? 5 : span > 14 ? 2 : 1;
+  return span > 100 ? 20 : span > 45 ? 10 : 5;
+}
+
+function renderScene() {
+  const c = cfg(), z = zone();
+  const sim = P.simulate(c, z);
+  const g = geometry(c, z);
+  const cmpEnds = ['A', 'B'].map((k) => S.compare[k]?.endX).filter((x) => x != null);
+  const v = (VIEW = computeView(c, z, sim, g, cmpEnds));
+  const fl = flight(c, z, sim, g);
+  S.anim.endT = fl.tEnd;
+  VIEW.sim = sim; VIEW.fl = fl; VIEW.c = c; VIEW.g = g;
+  const svg = $('#scene');
+  svg.setAttribute('viewBox', `0 0 ${v.W} ${v.H}`);
+
+  const out = [];
+  out.push(`<defs>
+    <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="sky-top"/><stop offset="1" class="sky-bot"/></linearGradient>
+    ${['v', 'x', 'y'].map((k) => `<marker id="ar${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="m${k}"/></marker>`).join('')}
+    <marker id="dimA" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9" class="dim"/></marker>
+    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" class="okS" stroke-width="2"/></pattern>
+  </defs>`);
+  out.push(`<rect x="0" y="0" width="${v.W}" height="${v.H}" fill="url(#skyG)"/>`);
+
+  // grid + axes
+  const lu = unitOf('length');
+  const dx = (m) => U.lengthFromSI(m, S.units);
+  const step = gridStep(dx(v.xMax - v.xMin));
+  const stepM = U.lengthToSI(step, S.units);
+  const bottom = v.H - v.pad.b;
+  if (S.toggles.grid) {
+    const gl = [];
+    for (let x = Math.ceil(v.xMin / stepM) * stepM; x <= v.xMax + 1e-9; x += stepM) gl.push(`<line class="grid" x1="${v.X(x)}" y1="${v.pad.t}" x2="${v.X(x)}" y2="${bottom}"/>`);
+    for (let y = Math.ceil(v.yMin / stepM) * stepM; y <= v.yMax + 1e-9; y += stepM) gl.push(`<line class="grid" x1="${v.pad.l}" y1="${v.Y(y)}" x2="${v.W - v.pad.r}" y2="${v.Y(y)}"/>`);
+    out.push(gl.join(''));
+  }
+  // terrain: run-in + ramp arc, gap, landing deck
+  const th = P.degToRad(Math.max(c.angleDeg, 0.5));
+  const cx = -g.rampLen, cy = g.runY + RAMP_R;
+  const arc = [];
+  for (let i = 0; i <= 24; i++) { const ph = (th * i) / 24; arc.push({ x: cx + RAMP_R * Math.sin(ph), y: cy - RAMP_R * Math.cos(ph) }); }
+  const back = { x: Math.min(ft(1.2), g.deckStart * 0.5), y: g.floorY };
+  out.push(`<rect class="gap" x="${v.X(0)}" y="${v.Y(g.floorY)}" width="${v.X(g.deckStart) - v.X(0)}" height="${v.H - v.Y(g.floorY)}"/>`);
+  out.push(`<polygon class="dirt" points="${v.X(v.xMin) - 2},${v.H} ${v.X(v.xMin) - 2},${v.Y(g.runY)} ${pts(v, arc)} ${v.X(back.x)},${v.Y(back.y)} ${v.X(back.x)},${v.H}"/>`);
+  out.push(`<polyline class="edge" points="${v.X(v.xMin) - 2},${v.Y(g.runY)} ${pts(v, arc)}"/>`);
+  out.push(`<polygon class="dirt" points="${v.X(g.deckStart)},${v.H} ${v.X(g.deckStart)},${v.Y(c.yL)} ${v.W + 2},${v.Y(c.yL)} ${v.W + 2},${v.H}"/>`);
+  out.push(`<polyline class="edge" points="${v.X(g.deckStart)},${v.Y(g.floorY)} ${v.X(g.deckStart)},${v.Y(c.yL)} ${v.W + 2},${v.Y(c.yL)}"/>`);
+
+  // axes (datum y=0, lip x=0)
+  out.push(`<line class="axis" x1="${v.pad.l}" y1="${v.Y(0)}" x2="${v.W - v.pad.r}" y2="${v.Y(0)}" stroke-dasharray="2 5"/>`);
+  out.push(`<line class="axis" x1="${v.X(0)}" y1="${v.pad.t}" x2="${v.X(0)}" y2="${bottom}" stroke-dasharray="2 5"/>`);
+  if (S.toggles.grid) {
+    const tk = [];
+    for (let x = Math.ceil(v.xMin / stepM) * stepM; x <= v.xMax + 1e-9; x += stepM) tk.push(`<text class="tick" x="${v.X(x)}" y="${v.H - 10}" text-anchor="middle">${+dx(x).toFixed(1)}</text>`);
+    for (let y = Math.ceil(v.yMin / stepM) * stepM; y <= v.yMax + 1e-9; y += stepM) tk.push(`<text class="tick" x="${v.pad.l - 6}" y="${v.Y(y) + 4}" text-anchor="end">${+dx(y).toFixed(1)}</text>`);
+    out.push(tk.join(''));
+  }
+  out.push(`<text class="axlbl" x="${v.W - v.pad.r - 4}" y="${v.Y(0) - 6}" text-anchor="end">x (${lu})</text>`);
+  out.push(`<text class="axlbl" x="${v.X(0) + 6}" y="${v.pad.t + 14}">y (${lu})</text>`);
+
+  // landing zone
+  if (!hiddenByMission()) {
+    const zx1 = v.X(Math.max(g.zStart, g.deckStart)), zx2 = v.X(g.zEnd), zy = v.Y(c.yL);
+    out.push(`<rect class="zone" x="${zx1}" y="${zy - 7}" width="${Math.max(0, zx2 - zx1)}" height="10" fill="url(#hatch)"/>`);
+    out.push(`<line class="tgt" x1="${v.X(z.targetX)}" y1="${zy - 16}" x2="${v.X(z.targetX)}" y2="${zy + 4}"/>`);
+    out.push(`<text class="zlbl" x="${(zx1 + zx2) / 2}" y="${zy + 22}" text-anchor="middle">LANDING ZONE</text>`);
+  }
+
+  // comparison paths
+  for (const k of ['A', 'B']) {
+    const j = S.compare[k];
+    if (!j) continue;
+    out.push(`<polyline class="cmp${k}" points="${pts(v, j.path)}"/>`);
+    const e = j.path.at(-1);
+    out.push(`<text class="lbl cmp${k}t" x="${v.X(e.x)}" y="${v.Y(e.y) - 10}" text-anchor="middle">${k}</text>`);
+  }
+  // ghost attempts
+  for (const gh of S.ghosts) out.push(`<polyline class="ghost" points="${pts(v, gh)}"/>`);
+
+  // predicted path
+  if (pathVisible() && sim.status !== P.RESULT.INVALID) out.push(`<polyline class="pred" points="${pts(v, pathPts(c, fl.tEnd))}"/>`);
+
+  // measurements & landing marker
+  const showRes = resultVisible() && !hiddenByMission();
+  if (showRes && sim.status !== P.RESULT.INVALID) {
+    const top = sim.apex;
+    const L = sim.landing;
+    if (S.toggles.measure) {
+      if (top.t > 0) {
+        out.push(`<circle class="apexdot" cx="${v.X(top.x)}" cy="${v.Y(top.y)}" r="3.5"/>`);
+        out.push(`<text class="lbl" x="${v.X(top.x)}" y="${v.Y(top.y) - 10}" text-anchor="middle">peak y = ${fmtL(top.y)}</text>`);
+      }
+      const endX = L && fl.kind === 'deck' ? L.x : P.positionAt(c, fl.tEnd).x;
+      const dimY = v.Y(g.floorY) - 16;
+      out.push(`<line class="dim" x1="${v.X(0)}" y1="${dimY}" x2="${v.X(endX)}" y2="${dimY}" marker-start="url(#dimA)" marker-end="url(#dimA)"/>`);
+      out.push(`<text class="lbl big" x="${(v.X(0) + v.X(endX)) / 2}" y="${dimY - 7}" text-anchor="middle">${L && fl.kind === 'deck' ? 'x_L' : 'x'} = ${fmtL(endX)}</text>`);
+      if (Math.abs(c.y0 - c.yL) > 1e-6) {
+        const xx = v.X(g.deckStart) - 12;
+        out.push(`<line class="dimdash" x1="${v.X(0)}" y1="${v.Y(c.y0)}" x2="${xx + 6}" y2="${v.Y(c.y0)}"/>`);
+        out.push(`<line class="dim" x1="${xx}" y1="${v.Y(c.y0)}" x2="${xx}" y2="${v.Y(c.yL)}" marker-start="url(#dimA)" marker-end="url(#dimA)"/>`);
+        const ly = c.yL < c.y0 ? v.Y(c.yL) - 8 : v.Y(c.yL) + 18;
+        out.push(`<text class="lbl" x="${xx - 6}" y="${ly}" text-anchor="end">Δy = ${signed(c.yL - c.y0)}</text>`);
+      }
+    }
+    const endP = P.positionAt(c, fl.tEnd);
+    const st = sim.status;
+    const cls = st === 'success' ? 'ok' : st === 'overshoot' ? 'warn' : 'bad';
+    const icon = st === 'success' ? '✓' : st === 'overshoot' ? '→' : '✕';
+    out.push(`<circle cx="${v.X(endP.x)}" cy="${v.Y(endP.y)}" r="7" class="${cls}"/>`);
+    out.push(`<text class="lbl ${cls}" x="${v.X(endP.x)}" y="${v.Y(endP.y) + (fl.kind === 'deck' && !hiddenByMission() ? 42 : 24)}" text-anchor="middle">${icon} ${esc(statusShort(sim))}</text>`);
+  }
+
+  if (S.toggles.annot && pathVisible() && sim.status !== P.RESULT.INVALID) {
+    const top = sim.apex;
+    const mid = P.positionAt(c, fl.tEnd * 0.25);
+    out.push(`<text class="annot" x="${v.X(mid.x) - 10}" y="${v.Y(mid.y) - 14}" text-anchor="end">y = y₀ + v₀sinθ·t − ½gt²</text>`);
+    if (top.t > 0) out.push(`<text class="annot" x="${v.X(top.x) + 12}" y="${v.Y(top.y) + 22}">vᵧ = 0 here</text>`);
+    out.push(`<text class="annot" x="${v.X(0) + 8}" y="${v.Y(c.y0) + 22}">(0, y₀)</text>`);
+  }
+
+  out.push('<g id="dyn"></g>');
+  out.unshift(`<desc id="sceneDesc">${esc(sceneDescription(sim))}</desc>`);
+  svg.innerHTML = out.join('');
+  renderDynamic();
+}
+
+function statusShort(sim) {
+  switch (sim.status) {
+    case 'success': return 'In the zone';
+    case 'overshoot': return 'Overshot';
+    case 'undershoot': return sim.hitsFace ? 'Hit the deck face' : 'Short';
+    case 'no-landing': return 'Never reaches deck';
+    default: return 'Check inputs';
+  }
+}
+function statusLong(sim) {
+  const L = sim.landing;
+  switch (sim.status) {
+    case 'success': return `Lands ${fmtL(L.x)} out, inside the zone.`;
+    case 'overshoot': return `Lands ${fmtL(L.x)} out, ${fmtL(sim.miss)} past the zone.`;
+    case 'undershoot': return sim.hitsFace ? 'Still below deck height at the deck edge, so the rider hits the face of the landing.' : `Reaches deck height ${fmtL(L.x)} out, ${fmtL(-sim.miss)} before the deck starts.`;
+    case 'no-landing': return `The deck is higher than the peak (${fmtL(sim.apex.y)}), so the path never comes down onto it.`;
+    default: return 'Some inputs are not valid numbers.';
+  }
+}
+function sceneDescription(sim) {
+  if (!resultVisible()) return `Jump setup: ${fmtS(S.vars.speed)} at ${fmtA(S.vars.angle)}. Result hidden until the jump runs.`;
+  return `Jump: ${fmtS(S.vars.speed)} at ${fmtA(S.vars.angle)}, takeoff ${fmtL(S.vars.takeoffElev)}, landing ${fmtL(S.vars.landingElev)}. ${statusLong(sim)}`;
+}
+
+/* rider + velocity vectors (redrawn every frame) */
+function renderDynamic() {
+  const v = VIEW;
+  if (!v) return;
+  const c = v.c, t = Math.min(S.anim.t, v.fl.tEnd);
+  const host = $('#dyn');
+  if (!host) return;
+  const out = [];
+  if (v.sim.status === P.RESULT.INVALID) { host.innerHTML = ''; return; }
+  if (t > 0) out.push(`<polyline class="flown" points="${pts(v, pathPts(c, t, Math.max(4, Math.round(60 * t / Math.max(v.fl.tEnd, 1e-3)))))}"/>`);
+  const p = P.positionAt(c, t), vel = P.velocityAt(c, t);
+  const deg = (Math.atan2(vel.vy, vel.vx) * 180) / Math.PI;
+  const rp = Math.max(6, ft(1.15) * v.s), wb = rp * 3.6;
+  const X = v.X(p.x), Y = v.Y(p.y);
+  out.push(`<g class="rider" transform="translate(${X.toFixed(1)} ${Y.toFixed(1)}) rotate(${(-deg).toFixed(2)})">
+    <circle cx="${-wb / 2}" cy="${-rp}" r="${rp}"/><circle cx="${wb / 2}" cy="${-rp}" r="${rp}"/>
+    <polyline points="${-wb / 2},${-rp} ${-wb * 0.05},${-rp * 0.9} ${wb * 0.32},${-rp * 2.2} ${wb / 2},${-rp}"/>
+    <polyline points="${-wb / 2},${-rp} ${-wb * 0.12},${-rp * 2.2} ${-wb * 0.05},${-rp * 0.9}"/>
+    <polyline points="${-wb * 0.05},${-rp * 0.9} ${wb * 0.02},${-rp * 2.5} ${wb * 0.22},${-rp * 3.4} ${wb * 0.34},${-rp * 2.35}"/>
+    <circle class="head" cx="${wb * 0.27}" cy="${-rp * 4}" r="${rp * 0.5}"/>
+  </g>`);
+  if (S.toggles.vectors) {
+    const k = v.s * 0.13; // px per (m/s)
+    const ox = X, oy = Y - rp * 1.2;
+    const ex = ox + vel.vx * k, ey = oy - vel.vy * k;
+    out.push(`<line class="vec vx" x1="${ox}" y1="${oy}" x2="${ex}" y2="${oy}" marker-end="url(#arx)"/>`);
+    if (Math.abs(vel.vy) > 0.05) out.push(`<line class="vec vy" x1="${ex}" y1="${oy}" x2="${ex}" y2="${ey}" marker-end="url(#ary)"/>`);
+    out.push(`<line class="vec vv" x1="${ox}" y1="${oy}" x2="${ex}" y2="${ey}" marker-end="url(#arv)"/>`);
+    out.push(`<text class="lbl tx" x="${(ox + ex) / 2}" y="${oy + 18}" text-anchor="middle">vₓ ${fmtV(vel.vx, 1)}</text>`);
+    out.push(`<text class="lbl ty" x="${ex + 8}" y="${(oy + ey) / 2 + 4}">vᵧ ${fmtV(vel.vy, 1)}</text>`);
+  }
+  host.innerHTML = out.join('');
+  $('#tLabel').textContent = `t = ${t.toFixed(2)} s`;
+  const sc = $('#scrub');
+  const frac = v.fl.tEnd > 0 ? t / v.fl.tEnd : 0;
+  if (document.activeElement !== sc) sc.value = Math.round(frac * 1000);
+  sc.style.setProperty('--fill', `${frac * 100}%`);
+}
+
+/* ============================ animation ============================ */
+let raf = 0, lastTs = 0;
+function frame(ts) {
+  if (!S.anim.playing) return;
+  const dt = Math.min(0.05, (ts - (lastTs || ts)) / 1000);
+  lastTs = ts;
+  S.anim.t += dt * S.anim.rate;
+  if (S.anim.t >= S.anim.endT) {
+    S.anim.t = S.anim.endT;
+    S.anim.playing = false;
+    renderDynamic();
+    updatePlayBtn();
+    onLanded();
+    return;
+  }
+  renderDynamic();
+  raf = requestAnimationFrame(frame);
+}
+function play() {
+  if (S.anim.playing) return;
+  if (S.anim.t >= S.anim.endT) S.anim.t = 0;
+  S.anim.playing = true;
+  lastTs = 0;
+  updatePlayBtn();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches && S.anim.rate >= 1) { S.anim.t = S.anim.endT; frame(performance.now()); return; }
+  raf = requestAnimationFrame(frame);
+}
+function stopAnim() { S.anim.playing = false; cancelAnimationFrame(raf); updatePlayBtn(); }
+function updatePlayBtn() {
+  const b = $('#playBtn');
+  b.textContent = S.anim.playing ? '❚❚ Pause' : '▶ Play';
+  b.setAttribute('aria-label', S.anim.playing ? 'Pause' : 'Play');
+}
+
+function sendIt() {
+  const c = currentChallenge();
+  if (c && !canSend(c)) return;
+  stopAnim();
+  S.anim.t = 0;
+  S.anim.counted = false;
+  play();
+}
+function onLanded() {
+  const wasNew = !S.anim.counted;
+  S.anim.counted = true;
+  S.flownKey = key();
+  if (S.blind) S.revealed = true;
+  if (wasNew) {
+    S.session.jumps++;
+    const c = currentChallenge();
+    if (c) registerAttempt(c);
+  }
+  renderScene();
+  renderReadouts();
+  renderActivity();
+  if (S.wbTab === 'sub') renderWorkbench();
+  announce(sceneDescription(VIEW.sim));
+}
+
+/* ============================ readouts ============================ */
+function renderReadouts() {
+  const sim = VIEW.sim, show = resultVisible() && !hiddenByMission() && sim.status !== 'invalid';
+  const L = sim.landing;
+  const cell = (k, v) => `<div class="ro"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const dash = '<span style="color:var(--faint)">—</span>';
+  const split = (s) => { const i = s.lastIndexOf(' '); return `${s.slice(0, i)}<small>${s.slice(i + 1)}</small>`; };
+  const st = sim.status;
+  const pill = show ? `<span class="pill ${st}">${st === 'success' ? '✓' : st === 'overshoot' ? '→' : '✕'} ${statusShort(sim)}</span>` : `<span class="pill pending">${S.mode === 'challenge' ? 'Send it to test' : 'Hidden'}</span>`;
+  $('#readouts').innerHTML = [
+    cell('Airtime', show && L ? split(fmtT(L.t)) : dash),
+    cell('Distance x<sub>L</sub>', show && L ? split(fmtL(L.x)) : dash),
+    cell('Max height', show ? split(fmtL(sim.apex.y)) : dash),
+    cell('Landing speed', show && L ? split(fmtS(L.speed)) : dash),
+    cell('Result', pill),
+  ].join('');
+}
+
+/* ========================= challenge engine ========================= */
+function successText(c) {
+  const zs = P.zoneBounds({ targetX: ft(c.zone.targetX), width: ft(c.zone.width) });
+  const zr = `${fmtL(zs.start)} – ${fmtL(zs.end)}`;
+  switch (c.type) {
+    case 'min-speed': return `Land in the zone (${zr}) no more than ${fmtL(ft(c.success.maxPastStart))} past the deck edge.`;
+    case 'two-jumps': return `Land in the zone (${zr}) twice, with launch angles at least ${c.success.minAngleDiff}° apart.`;
+    case 'calculate': return `Your calculated distance must be within ${fmtL(ft(c.success.tolerance))} of the real landing.`;
+    default: return `Land in the zone: ${zr}.`;
+  }
+}
+function canSend(c) {
+  const st = chState(c.id);
+  if (c.prediction && st.predicted === null) return false;
+  if (c.type === 'calculate' && st.answer === null) return false;
+  return true;
+}
+function loadChallenge(id) {
+  S.challengeId = id;
+  S.mode = 'challenge';
+  S.showList = false;
+  S.tutorLocks = {};
+  S.ghosts = [];
+  S.flownKey = null;
+  const c = currentChallenge();
+  const base = { ...EXPLORE_DEFAULTS, targetX: c.zone.targetX, zoneWidth: c.zone.width, ...c.initial, ...c.fixed };
+  for (const k in base) S.vars[k] = impToSI(VAR[k].kind, base[k]);
+  S.toggles.path = false;
+  const st = chState(id);
+  if (!st.started) { st.started = true; S.session.started.add(id); c.concepts.forEach((x) => S.session.concepts.add(x)); }
+  refreshAll();
+}
+function registerAttempt(c) {
+  const st = chState(c.id);
+  const sim = VIEW.sim;
+  st.attempts++;
+  S.session.attempts++;
+  S.ghosts = [...S.ghosts, pathPts(VIEW.c, VIEW.fl.tEnd, 50)].slice(-4);
+  const L = sim.landing;
+  const zs = P.zoneBounds(zone());
+  let ok = sim.status === 'success', title, body, tone;
+  const air = L ? ` Airtime ${fmtT(L.t)}, peak ${fmtL(sim.apex.y)}.` : '';
+  if (c.type === 'calculate') {
+    const err = L ? Math.abs(st.answer - L.x) : Infinity;
+    ok = err <= ft(c.success.tolerance);
+    title = ok ? 'Called it' : 'Not quite';
+    body = `You predicted ${fmtL(st.answer)}. The rider landed at ${L ? fmtL(L.x) : 'no valid landing'}, off by ${Number.isFinite(err) ? fmtL(err) : '—'}.` + (ok ? ' Your math matches the simulation.' : ' Open the worked solution to find where the numbers split.');
+    tone = ok ? 'success' : 'fail';
+  } else if (!ok) {
+    tone = sim.status === 'overshoot' ? 'near' : 'fail';
+    if (sim.status === 'undershoot') {
+      title = sim.hitsFace ? 'Hit the face' : `Short by ${fmtL(-sim.miss)}`;
+      body = (sim.hitsFace ? 'You were still below deck height when you reached the edge.' : `You reached deck height at ${fmtL(L.x)}; the deck starts at ${fmtL(zs.start)}.`) + ' You need more distance: more airtime, more forward speed, or both.';
+    } else if (sim.status === 'overshoot') {
+      title = `Long by ${fmtL(sim.miss)}`;
+      body = `You landed at ${fmtL(L.x)}, past the end of the zone at ${fmtL(zs.end)}. Take a little off.`;
+    } else { title = 'No landing'; body = statusLong(sim); }
+  } else if (c.type === 'min-speed') {
+    const past = L.x - zs.start;
+    const vmin = P.speedForDistance(zs.start, S.vars.angle, S.vars.takeoffElev, S.vars.landingElev);
+    if (past > ft(c.success.maxPastStart)) {
+      ok = false; tone = 'near'; title = 'Cleared it, with speed to spare';
+      body = `You landed ${fmtL(past)} past the edge. That means you're carrying more speed than you need. Back it off and find the minimum.`;
+    } else {
+      title = 'Minimum speed found';
+      body = `${fmtS(S.vars.speed)} lands ${fmtL(past)} past the edge. The exact minimum from the formula is ${fmtS(vmin)}. Any slower and you land in the gap.` + air;
+      tone = 'success';
+    }
+  } else if (c.type === 'two-jumps') {
+    st.jumps.push({ angle: S.vars.angle, speed: S.vars.speed, t: L.t, h: sim.apex.y, x: L.x });
+    const pair = findPair(st.jumps, c.success.minAngleDiff);
+    if (pair) {
+      title = 'Two different jumps, same landing';
+      const [a, b] = pair;
+      body = `${fmtA(a.angle)} at ${fmtS(a.speed)} vs ${fmtA(b.angle)} at ${fmtS(b.speed)}. The steeper jump flew ${fmtT(Math.max(a.t, b.t))} vs ${fmtT(Math.min(a.t, b.t))} and peaked ${fmtL(Math.abs(a.h - b.h))} higher.`;
+      tone = 'success';
+    } else {
+      ok = false; tone = 'near'; title = `Jump ${st.jumps.length} logged`;
+      body = `Landed at ${fmtL(L.x)} with a ${fmtA(S.vars.angle)} lip. Now land another one with an angle at least ${c.success.minAngleDiff}° different.`;
+    }
+  } else {
+    title = 'Stuck it';
+    body = `Landed ${fmtL(L.x)} out, ${fmtL(Math.abs(sim.targetError))} from the center of the zone.` + air;
+    tone = 'success';
+  }
+  st.last = { title, body, tone };
+  if (ok && !st.solved) { st.solved = true; S.session.completed.add(c.id); }
+}
+function findPair(jumps, minDiff) {
+  for (let i = 0; i < jumps.length; i++) for (let j = i + 1; j < jumps.length; j++) if (Math.abs(jumps[i].angle - jumps[j].angle) >= minDiff - 1e-9) return [jumps[i], jumps[j]];
+  return null;
+}
+
+/* ========================= activity panel ========================= */
+function renderActivity() {
+  const host = $('#activityPanel');
+  if (S.mode === 'explore') host.innerHTML = exploreHTML();
+  else host.innerHTML = S.showList ? listHTML() : missionHTML(currentChallenge());
+  if (S.mode === 'explore') renderLiveFeedback();
+  const send = $('#sendBtn');
+  const c = currentChallenge();
+  send.disabled = !!(c && !S.showList && !canSend(c));
+  send.title = send.disabled ? (c.type === 'calculate' && chState(c.id).answer === null ? 'Lock in your answer first' : 'Make a prediction first') : '';
+}
+
+function exploreHTML() {
+  const p = S.predict;
+  let pred = `<div class="row"><select id="predSel" aria-label="Prediction question" style="width:100%">${PREDICTIONS.map((q, i) => `<option value="${i}">${esc(q.prompt)}</option>`).join('')}</select><button class="btn" id="predStart">Make a prediction</button></div>`;
+  if (p) {
+    const q = PREDICTIONS[p.q];
+    const opts = q.options.map((o, i) => {
+      let cls = '';
+      if (p.done) { if (i === p.correct) cls = 'correct'; else if (i === p.choice) cls = 'wrong'; }
+      return `<button class="opt ${cls}" data-pick="${i}" aria-pressed="${p.choice === i}" ${p.done ? 'disabled' : ''}>${esc(o.label)}</button>`;
+    }).join('');
+    const label = { distance: 'Distance', height: 'Height gained above the lip', time: 'Airtime' }[q.measure];
+    const fmtM = (x) => (q.measure === 'time' ? fmtT(x) : fmtL(x));
+    pred = `<p><strong>${esc(q.prompt)}</strong></p><div class="opts">${opts}</div>
+      ${p.done ? `<div class="feedback ${p.choice === p.correct ? 'success' : 'fail'}"><strong>${p.choice === p.correct ? 'Your prediction held up' : 'Surprise'}</strong>
+        ${label}: ${p.before == null ? '—' : fmtM(p.before)} → ${p.after == null ? '—' : fmtM(p.after)} (${p.ratio ? ((p.ratio - 1) * 100 >= 0 ? '+' : '') + ((p.ratio - 1) * 100).toFixed(0) + '%' : 'n/a'}).<br>${esc(q.why)}</div>
+        <div class="row"><button class="btn small" id="predUndo">Undo the change</button><button class="btn small ghost" id="predClose">Done</button></div>`
+      : `<div class="row"><button class="btn primary" id="predReveal" ${p.choice == null ? 'disabled' : ''}>Reveal</button><button class="btn small ghost" id="predClose">Cancel</button></div>`}`;
+  }
+  return `<h2>Explore</h2>
+    <p style="margin:0 0 12px;color:var(--muted)">Move any slider and the arc updates live. Hit <b>Send it</b> to ride it, or scrub time to step through the flight.</p>
+    <div id="liveFb"></div>
+    <div class="block"><div class="eyebrow">Predict, then test</div>${pred}</div>
+    <div class="block"><div class="eyebrow">Compare two jumps</div>
+      <div class="row"><button class="btn small" id="saveA"><span class="swatch" style="background:var(--cmpA)"></span>Save as A</button><button class="btn small" id="saveB"><span class="swatch" style="background:var(--cmpB)"></span>Save as B</button>${S.compare.A || S.compare.B ? '<button class="btn small ghost" id="clearCmp">Clear</button>' : ''}</div>
+      ${compareTable()}</div>
+    <div class="block"><button class="btn" data-goto="challenge">Try the missions →</button></div>`;
+}
+function renderLiveFeedback() {
+  const el = $('#liveFb');
+  if (!el) return;
+  const sim = VIEW.sim;
+  if (!resultVisible()) { el.innerHTML = `<div class="feedback"><strong>Result hidden</strong>Make your call, then send it.</div>`; return; }
+  const tone = sim.status === 'success' ? 'success' : sim.status === 'overshoot' ? 'near' : 'fail';
+  el.innerHTML = `<div class="feedback ${tone}"><strong>${esc(statusShort(sim))}</strong>${esc(statusLong(sim))}${sim.landing ? ` Airtime ${fmtT(sim.landing.t)}.` : ''}</div>`;
+}
+function snapshot() {
+  const c = cfg(), z = zone(), sim = P.simulate(c, z), g = geometry(c, z), fl = flight(c, z, sim, g);
+  const path = pathPts(c, fl.tEnd, 60);
+  return { vars: { ...S.vars }, sim, path, endX: path.at(-1).x };
+}
+function compareTable() {
+  const A = S.compare.A, B = S.compare.B;
+  if (!A && !B) return '<p style="margin:8px 0 0;color:var(--muted);font-size:14px">Save the current jump as A, change something, save it as B. Both arcs stay on the canvas.</p>';
+  const row = (name, f, diff) => `<tr><td>${name}</td><td>${A ? f(A) : '—'}</td><td>${B ? f(B) : '—'}</td>${diff ? `<td>${A && B ? diff(A, B) : '—'}</td>` : '<td></td>'}</tr>`;
+  const L = (j) => j.sim.landing;
+  const pctd = (a, b) => (a && b ? `${((b / a - 1) * 100 >= 0 ? '+' : '')}${((b / a - 1) * 100).toFixed(0)}%` : '—');
+  return `<div style="overflow-x:auto;margin-top:10px"><table class="cmp"><thead><tr><th></th><th><span class="swatch" style="background:var(--cmpA)"></span>A</th><th><span class="swatch" style="background:var(--cmpB)"></span>B</th><th>B vs A</th></tr></thead><tbody>
+    ${row('Speed', (j) => fmtS(j.vars.speed), (a, b) => pctd(a.vars.speed, b.vars.speed))}
+    ${row('Angle', (j) => fmtA(j.vars.angle))}
+    ${row('Flight time', (j) => (L(j) ? fmtT(L(j).t) : '—'), (a, b) => pctd(L(a)?.t, L(b)?.t))}
+    ${row('Distance', (j) => (L(j) ? fmtL(L(j).x) : '—'), (a, b) => pctd(L(a)?.x, L(b)?.x))}
+    ${row('Max height', (j) => fmtL(j.sim.apex.y))}
+    ${row('Lands at', (j) => (L(j) ? `(${fmtL(L(j).x)}, ${fmtL(L(j).y)})` : 'none'))}
+    ${row('Result', (j) => statusShort(j.sim))}
+  </tbody></table></div>`;
+}
+
+function listHTML() {
+  const items = CHALLENGES.map((c, i) => ({ c, i })).filter(({ c }) => S.diffFilter === 'all' || c.difficulty === S.diffFilter);
+  return `<h2>Missions</h2>
+    <div class="filters" role="group" aria-label="Difficulty">${['all', ...DIFFS].map((d) => `<button class="chip" data-diff="${d}" aria-pressed="${S.diffFilter === d}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div>
+    <div class="challenge-list">${items.map(({ c, i }) => {
+      const st = S.ch[c.id];
+      return `<button class="cl-item" data-ch="${c.id}" aria-current="${c.id === S.challengeId}"><span class="n">${i + 1}</span><span><span class="t">${esc(c.title)}</span><br><span class="s"><span class="diff ${c.difficulty}">${c.difficulty}</span></span></span>${st?.solved ? '<span class="done">✓ Done</span>' : st?.attempts ? `<span class="s">${st.attempts} tries</span>` : '<span></span>'}</button>`;
+    }).join('') || '<p style="color:var(--muted)">No missions at this level yet.</p>'}</div>`;
+}
+
+function missionHTML(c) {
+  const st = chState(c.id);
+  const idx = CHALLENGES.indexOf(c);
+  const lockedList = VARS.filter((v) => isLocked(v.key) && v.key in { ...c.fixed, targetX: 1, zoneWidth: 1 }).map((v) => {
+    if ((v.key === 'targetX' || v.key === 'zoneWidth') && c.hideZoneUntilAnswered && st.answer === null) return `<span class="varchip fix">${esc(v.label)}: hidden</span>`;
+    return `<span class="varchip fix">🔒 ${esc(v.label)}: ${v.kind === 'angle' ? fmtA(S.vars[v.key]) : v.kind === 'speed' ? fmtS(S.vars[v.key]) : fmtL(S.vars[v.key])}</span>`;
+  }).join('');
+  const adj = VARS.filter((v) => !isLocked(v.key)).map((v) => `<span class="varchip adj">↔ ${esc(v.label)}</span>`).join('');
+  let pre = '';
+  if (c.prediction) {
+    const pr = c.prediction, chosen = st.predicted;
+    const reveal = chosen !== null && st.attempts > 0;
+    pre = `<div class="block"><div class="eyebrow">Before you jump</div><p style="margin:0"><strong>${esc(pr.prompt)}</strong></p><div class="opts">${pr.options.map((o, i) => {
+      let cls = '';
+      if (reveal) { if (i === pr.answer) cls = 'correct'; else if (i === chosen) cls = 'wrong'; }
+      return `<button class="opt ${cls}" data-cpred="${i}" aria-pressed="${chosen === i}" ${chosen !== null ? 'disabled' : ''}>${esc(o)}</button>`;
+    }).join('')}</div>${reveal ? `<p style="margin:0;font-size:14px;color:var(--muted)">${esc(pr.why)}</p>` : chosen !== null ? '<p style="margin:0;font-size:14px;color:var(--muted)">Locked in. Send it to see if you were right.</p>' : ''}</div>`;
+  }
+  let calc = '';
+  if (c.type === 'calculate') {
+    calc = st.answer === null
+      ? `<div class="block"><div class="eyebrow">Your answer</div><label for="ansIn" style="font-size:14px">Landing distance x<sub>L</sub></label><div class="answer-in"><input id="ansIn" type="number" step="0.1" inputmode="decimal" placeholder="?"><span class="unit">${unitOf('length')}</span><button class="btn" id="ansLock">Lock in answer</button></div><div class="err" id="ansErr" role="alert" style="color:var(--bad);font-size:13px"></div></div>`
+      : `<div class="block"><div class="eyebrow">Your answer</div><div class="row"><span class="num" style="font-size:20px">${fmtL(st.answer)}</span><button class="btn small ghost" id="ansClear">Change answer</button></div></div>`;
+  }
+  const fb = st.last ? `<div class="feedback ${st.last.tone}" role="status"><strong>${esc(st.last.title)}</strong>${esc(st.last.body)}</div>` : '';
+  const jumps = c.type === 'two-jumps' && st.jumps.length ? `<div class="block"><div class="eyebrow">Landed jumps</div><ol class="steps">${st.jumps.map((j) => `<li>${fmtA(j.angle)} @ ${fmtS(j.speed)} → ${fmtL(j.x)}, airtime ${fmtT(j.t)}</li>`).join('')}</ol></div>` : '';
+  const hintsShown = c.hints.slice(0, st.hints);
+  const hintBtn = st.hints < c.hints.length ? `<button class="btn small" id="hintBtn">Get hint ${st.hints + 1} of ${c.hints.length}</button>` : '';
+  const solOk = st.attempts > 0 || S.tutor;
+  return `<div class="row" style="justify-content:space-between"><span class="eyebrow">Mission ${idx + 1} of ${CHALLENGES.length}</span><button class="btn small ghost" id="toList">All missions</button></div>
+    <div class="mission"><div class="row" style="margin-top:6px"><span class="diff ${c.difficulty}">${c.difficulty}</span>${st.solved ? '<span class="done">✓ Completed</span>' : ''}<span class="s" style="color:var(--muted);font-size:13px;margin-left:auto">Attempts: <span class="num">${st.attempts}</span></span></div>
+      <h3>${esc(c.title)}</h3><p>${esc(c.description)}</p>
+      <ul>${c.objectives.map((o) => `<li>${esc(o)}</li>`).join('')}</ul>
+      <div class="varchips">${adj}${lockedList}</div>
+      <p style="font-size:14px"><b>Success:</b> ${esc(successText(c))}</p>
+    </div>
+    ${pre}${calc}
+    ${fb ? `<div class="block">${fb}</div>` : ''}${jumps}
+    ${st.solved ? `<div class="block"><div class="eyebrow">Why it works</div><p style="margin:0">${esc(c.explanation)}</p></div>` : ''}
+    <div class="block"><div class="eyebrow">Hints</div>${hintsShown.map((h, i) => `<div class="hint"><b>${i + 1}</b>${esc(h)}</div>`).join('')}${hintBtn || '<span style="font-size:13px;color:var(--muted)">All hints shown.</span>'}</div>
+    <div class="block"><div class="eyebrow">Worked solution</div>${st.solution ? `<ol class="steps">${c.solution.map((s) => `<li>${esc(s)}</li>`).join('')}</ol><p style="margin:0;font-size:12px;color:var(--muted)">Worked in feet and ft/s, with g = 32.17 ft/s².</p>` : `<button class="btn small" id="solBtn" ${solOk ? '' : 'disabled'}>Show worked solution</button>${solOk ? '' : '<span style="font-size:13px;color:var(--muted)"> Unlocks after your first attempt.</span>'}`}</div>
+    <div class="block row">${idx > 0 ? `<button class="btn small ghost" data-ch="${CHALLENGES[idx - 1].id}">← Previous</button>` : ''}${idx < CHALLENGES.length - 1 ? `<button class="btn small${st.solved ? '' : ' ghost'}" data-ch="${CHALLENGES[idx + 1].id}" style="margin-left:auto">Next mission →</button>` : ''}</div>`;
+}
+
+/* ============================ predictions ============================ */
+function measureOf(sim, q, c) {
+  if (q.measure === 'distance') return sim.landing?.x ?? null;
+  if (q.measure === 'time') return sim.landing?.t ?? null;
+  if (q.measure === 'height') return sim.apex.y - c.y0;
+  return null;
+}
+function revealPrediction() {
+  const p = S.predict, q = PREDICTIONS[p.q];
+  const before = measureOf(P.simulate(cfg(), zone()), q, cfg());
+  p.undo = { ...S.vars };
+  const imp = { speed: U.msToMph(S.vars.speed), angle: S.vars.angle, landingElev: U.mToFt(S.vars.landingElev) };
+  const next = q.apply(imp);
+  if (next.speed !== imp.speed) S.vars.speed = Math.min(U.mphToMs(next.speed), U.mphToMs(70));
+  if (next.angle !== imp.angle) S.vars.angle = next.angle;
+  if (next.landingElev !== imp.landingElev) S.vars.landingElev = ft(next.landingElev);
+  const after = measureOf(P.simulate(cfg(), zone()), q, cfg());
+  const ratio = before && after != null ? after / before : null;
+  p.before = before; p.after = after; p.ratio = ratio;
+  p.correct = ratio == null ? -1 : q.options.findIndex((o) => o.test(ratio));
+  p.done = true;
+  S.session.predictions++;
+  if (p.choice === p.correct) S.session.correct++;
+  syncControls();
+  onSetupChanged();
+  renderActivity();
+  sendIt();
+}
+
+/* ============================ workbench ============================ */
+const EQ = [
+  { name: 'Horizontal position', f: 'x(t) = v₀ cos(θ) · t', s: 'Forward distance = forward speed × time.', a: 'No horizontal force, so aₓ = 0 and x grows linearly with t.' },
+  { name: 'Vertical position', f: 'y(t) = y₀ + v₀ sin(θ) · t − ½ g t²', s: 'Start at the lip height, climb with your upward speed, and gravity pulls you back down.', a: 'Quadratic in t. The −½gt² term makes y(t) a downward-opening parabola.' },
+  { name: 'Horizontal velocity', f: 'vₓ = v₀ cos(θ)', s: 'Your forward speed never changes in the air.', a: 'The cosine component of the launch vector. Constant because aₓ = 0.' },
+  { name: 'Vertical velocity', f: 'vᵧ = v₀ sin(θ) − g t', s: 'Upward speed drops by g every second, hits zero at the peak, then you fall.', a: 'Linear in t with slope −g. vᵧ = 0 at t_peak = v₀ sin(θ) / g.' },
+  { name: 'Landing time', f: 't_L = [v₀ sinθ + √((v₀ sinθ)² + 2g(y₀ − y_L))] / g', s: 'When do you touch down? Set y(t) equal to the landing height and solve.', a: 'Quadratic formula on ½gt² − (v₀ sinθ)t − (y₀ − y_L) = 0, keeping the + root (the way down). Negative discriminant ⇒ no real landing.' },
+  { name: 'Landing distance', f: 'x_L = v₀ cos(θ) · t_L', s: 'Plug the landing time into the forward-distance equation.', a: 'Composition: x_L = x(t_L). Range on flat ground reduces to v₀² sin(2θ) / g.' },
+  { name: 'Peak height', f: 'y_max = y₀ + (v₀ sinθ)² / 2g', s: 'How high above the datum you get at the top of the arc.', a: 'From vᵧ² = (v₀ sinθ)² − 2g(y − y₀) with vᵧ = 0.' },
+  { name: 'Path shape y(x)', f: 'y = y₀ + x tanθ − g x² / (2 v₀² cos²θ)', s: 'Eliminate time and the path itself is a parabola in x.', a: 'Substitute t = x / (v₀ cosθ) into y(t). This is the curve drawn on the canvas.', adv: true },
+];
+const DEFS = [['v₀', 'takeoff speed (along the lip)'], ['θ', 'launch angle above horizontal'], ['g', 'gravity, 32.17 ft/s² or 9.81 m/s²'], ['t', 'time since leaving the lip'], ['y₀', 'lip height above the datum (y = 0)'], ['y_L', 'landing deck height'], ['x_L', 'horizontal distance to touchdown'], ['vₓ, vᵧ', 'horizontal and vertical parts of velocity']];
+
+function renderWorkbench() {
+  const host = $('#wbContent');
+  document.querySelectorAll('#workbench .tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.tab === S.wbTab));
+  if (S.eqHidden && S.wbTab !== 'concepts') { host.innerHTML = '<p class="hidden-note">Your tutor has hidden the equations for now. Make your prediction first.</p>'; return; }
+  if (S.wbTab === 'eq') {
+    const adv = S.level === 'advanced';
+    host.innerHTML = `<div class="eqgrid">${EQ.filter((e) => adv || !e.adv).map((e) => `<div class="eq"><div class="name">${e.name}</div><div class="f">${e.f}</div><div class="d">${adv ? e.a : e.s}</div></div>`).join('')}</div>
+      <div class="row" style="margin-top:12px"><button class="btn small" id="defsBtn" aria-expanded="${S.defs}">${S.defs ? 'Hide' : 'Show'} what each symbol means</button></div>
+      ${S.defs ? `<dl class="defs">${DEFS.map(([k, d]) => `<dt>${k}</dt><dd>${d}</dd>`).join('')}</dl>` : ''}`;
+  } else if (S.wbTab === 'sub') {
+    host.innerHTML = substitutionHTML();
+  } else {
+    host.innerHTML = `<div class="concepts">${Object.entries(CONCEPTS).map(([k, c]) => `<button class="concept" data-concept="${k}" aria-expanded="${S.session.concepts.has(k)}"><h4>${esc(c.title)}</h4><p>${esc(c.body)}</p></button>`).join('')}</div>`;
+  }
+}
+
+function substitutionHTML() {
+  const c = currentChallenge();
+  if (c && c.type === 'calculate' && chState(c.id).answer === null) return '<p class="hidden-note">Locked during this mission. Work it out by hand, lock in your answer, then this tab shows the full calculation.</p>';
+  if (S.blind && !S.revealed) return '<p class="hidden-note">Hidden until the tutor reveals the jump.</p>';
+  const m = met();
+  const gU = m ? 9.81 : 32.17, vu = U.UNIT_SYSTEMS[S.units].velocity, lu = unitOf('length');
+  const g = U.gFromSI(P.G, S.units);
+  const v0d = U.speedFromSI(S.vars.speed, S.units), v0 = U.velocityFromSI(S.vars.speed, S.units);
+  const th = S.vars.angle, rad = P.degToRad(th);
+  const y0 = U.lengthFromSI(S.vars.takeoffElev, S.units), yL = U.lengthFromSI(S.vars.landingElev, S.units);
+  const vx = v0 * Math.cos(rad), vy = v0 * Math.sin(rad);
+  const f = (x, d = 2) => (+x).toFixed(d);
+  const disc = vy * vy + 2 * g * (y0 - yL);
+  const steps = [];
+  steps.push(['Convert speed to ' + vu, m ? `v₀ = ${f(v0d, 1)} km/h ÷ 3.6 = <b>${f(v0)} ${vu}</b>` : `v₀ = ${f(v0d, 1)} mph × 5280 / 3600 = <b>${f(v0)} ${vu}</b>`]);
+  steps.push(['Split the velocity', `vₓ = ${f(v0)} · cos ${f(th, 1)}° = ${f(v0)} × ${f(Math.cos(rad), 4)} = <b>${f(vx)} ${vu}</b><br>vᵧ = ${f(v0)} · sin ${f(th, 1)}° = ${f(v0)} × ${f(Math.sin(rad), 4)} = <b>${f(vy)} ${vu}</b>`]);
+  steps.push(['Peak of the arc', `t_peak = vᵧ / g = ${f(vy)} / ${f(gU)} = <b>${f(vy / g, 3)} s</b><br>y_max = ${f(y0)} + ${f(vy)}² / (2 × ${f(gU)}) = <b>${f(y0 + (vy * vy) / (2 * g))} ${lu}</b>`]);
+  if (disc < 0) {
+    steps.push(['Landing time', `vᵧ² + 2g(y₀ − y_L) = ${f(vy * vy)} + 2 × ${f(gU)} × (${f(y0)} − ${f(yL)}) = <b>${f(disc)}</b><br>Square root of a negative number has no real answer. The deck is above your peak, so there is no landing.`]);
+  } else {
+    const tL = (vy + Math.sqrt(disc)) / g;
+    steps.push(['Landing time (quadratic, + root)', `t_L = [${f(vy)} + √(${f(vy * vy)} + 2 × ${f(gU)} × (${f(y0)} − ${f(yL)}))] / ${f(gU)}<br>&nbsp;&nbsp;&nbsp;&nbsp;= [${f(vy)} + √${f(disc)}] / ${f(gU)} = [${f(vy)} + ${f(Math.sqrt(disc))}] / ${f(gU)} = <b>${f(tL, 3)} s</b>`]);
+    const xL = vx * tL;
+    steps.push(['Landing distance', `x_L = vₓ · t_L = ${f(vx)} × ${f(tL, 3)} = <b>${f(xL)} ${lu}</b>`]);
+    if (!hiddenByMission()) {
+      const zs = P.zoneBounds(zone());
+      const a = U.lengthFromSI(zs.start, S.units), b = U.lengthFromSI(zs.end, S.units);
+      const verdict = xL < a ? `${f(xL)} &lt; ${f(a)} → short` : xL > b ? `${f(xL)} &gt; ${f(b)} → overshoot` : `${f(a)} ≤ ${f(xL)} ≤ ${f(b)} → in the zone`;
+      steps.push(['Check the landing zone', `Zone runs ${f(a)} to ${f(b)} ${lu}: ${verdict}`]);
+    }
+  }
+  return `<div class="work">${steps.map(([w, mth]) => `<div class="stp"><div><div class="what">${w}</div><div class="math">${mth}</div></div></div>`).join('')}</div>
+    <p style="margin:12px 0 0;font-size:12px;color:var(--muted)">Values update as you move the sliders. Rounded for display; the simulation keeps full precision.</p>`;
+}
+
+/* ============================== tutor ============================== */
+const DISCUSS = [
+  'What do you think will happen if we double the speed?',
+  'What happens if we increase the angle but keep speed the same?',
+  'Which variable has the greatest effect on horizontal distance?',
+  'Why does the trajectory form a parabola?',
+  'At the very top of the jump, what is vᵧ? What is vₓ?',
+  'Where in the jump is the rider moving fastest? Why?',
+];
+function renderTutor() {
+  const host = $('#tutorPanel');
+  host.hidden = !S.tutor;
+  if (!S.tutor) return;
+  const c = currentChallenge();
+  const st = c ? chState(c.id) : null;
+  host.innerHTML = `<h2>Tutor controls <span class="tag">TUTOR</span></h2>
+    <label for="tActivity" class="sub" style="display:block;margin-top:0">Activity</label>
+    <select id="tActivity" style="width:100%"><option value="explore" ${S.mode === 'explore' ? 'selected' : ''}>Explore (free play)</option>${CHALLENGES.map((x, i) => `<option value="${x.id}" ${c?.id === x.id ? 'selected' : ''}>Mission ${i + 1}: ${esc(x.title)}</option>`).join('')}</select>
+    <div class="sub">Lock variables</div>
+    <div class="locks">${VARS.map((v) => `<button class="btn small" data-lock="${v.key}" aria-pressed="${isLocked(v.key)}">${isLocked(v.key) ? '🔒' : '🔓'} ${esc(v.label)}</button>`).join('')}</div>
+    <div class="sub">Reveal and hide</div>
+    <div class="row">
+      <button class="btn small" id="tEq" aria-pressed="${S.eqHidden}">${S.eqHidden ? 'Show equations' : 'Hide equations'}</button>
+      <button class="btn small" id="tBlind" aria-pressed="${S.blind}">Hide result until reveal</button>
+      ${S.blind ? `<button class="btn small" id="tReveal" ${S.revealed ? 'disabled' : ''}>Reveal now</button>` : ''}
+    </div>
+    <div class="sub">Pause and discuss</div>
+    <div class="row"><select id="tQ" style="flex:1;min-width:0">${DISCUSS.map((q, i) => `<option value="${i}" ${i === S.discussQ ? 'selected' : ''}>${esc(q)}</option>`).join('')}</select><button class="btn small" id="tAsk">Ask</button></div>
+    ${c ? `<div class="sub">Hints for “${esc(c.title)}”</div><div style="display:grid;gap:6px">${c.hints.map((h, i) => `<button class="btn small" data-thint="${i}" ${i < st.hints ? 'disabled' : ''} style="justify-content:flex-start;text-align:left">${i < st.hints ? '✓ Shown' : 'Reveal'} hint ${i + 1}</button>`).join('')}<button class="btn small" id="tSol" ${st.solution ? 'disabled' : ''}>${st.solution ? '✓ Solution shown' : 'Reveal worked solution'}</button></div>` : ''}
+    <div class="sub">Setup</div>
+    <div class="row"><button class="btn small" id="tReset">Reset to starting values</button></div>
+    <p style="margin:10px 0 0;font-size:13px;color:var(--muted)">Type exact values in the number boxes to set initial conditions. Unlock a variable first if it is locked.</p>`;
+}
+function showDiscussion() {
+  stopAnim();
+  const o = $('#overlay');
+  o.hidden = false;
+  o.innerHTML = `<div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="dq"><div class="eyebrow">Pause and discuss</div><h3 id="dq">${esc(DISCUSS[S.discussQ])}</h3><p>Talk it through and commit to a prediction before you reveal.</p><div class="row"><button class="btn primary" id="dReveal">Reveal the jump</button><button class="btn ghost" id="dClose">Back</button></div></div>`;
+  $('#dReveal').focus();
+}
+function hideOverlay() { $('#overlay').hidden = true; }
+
+function resetSetup() {
+  if (S.mode === 'challenge') return loadChallenge(S.challengeId);
+  for (const k in EXPLORE_DEFAULTS) S.vars[k] = impToSI(VAR[k].kind, EXPLORE_DEFAULTS[k]);
+  S.inputErr = {};
+  syncControls();
+  onSetupChanged();
+}
+
+/* ============================== session ============================== */
+function sessionSummary() {
+  const s = S.session;
+  const mins = Math.max(1, Math.round((Date.now() - s.start) / 60000));
+  const hard = CHALLENGES.filter((c) => S.ch[c.id] && (S.ch[c.id].attempts >= 4 || S.ch[c.id].hints >= 2 || (S.ch[c.id].attempts >= 2 && !S.ch[c.id].solved)));
+  const revisit = [...new Set(hard.flatMap((c) => c.concepts))];
+  const hints = CHALLENGES.filter((c) => S.ch[c.id]?.hints).map((c) => `${c.title} (${S.ch[c.id].hints})`);
+  const text = [
+    `Jump Lab session — ${new Date(s.start).toLocaleDateString()}`,
+    `Time: ${mins} min · Jumps: ${s.jumps}`,
+    `Missions started: ${s.started.size} · completed: ${s.completed.size} (${[...s.completed].map((id) => CHALLENGES.find((c) => c.id === id).title).join(', ') || 'none'})`,
+    `Challenge attempts: ${s.attempts} · Hints used: ${s.hints}${hints.length ? ' — ' + hints.join(', ') : ''}`,
+    `Predictions: ${s.predictions} (${s.correct} correct)`,
+    `Concepts explored: ${[...s.concepts].join(', ') || 'none yet'}`,
+    `Areas of difficulty: ${hard.map((c) => c.title).join(', ') || 'none flagged'}`,
+    `Concepts to revisit: ${revisit.join(', ') || 'none flagged'}`,
+  ].join('\n');
+  return { s, mins, hard, revisit, text };
+}
+function showSession() {
+  const { s, mins, hard, revisit, text } = sessionSummary();
+  const m = $('#modal');
+  m.hidden = false;
+  m.innerHTML = `<section class="panel" role="dialog" aria-modal="true" aria-labelledby="sessT"><h2 id="sessT">This session</h2>
+    <div class="stats">
+      <div class="stat"><div class="v">${mins}m</div><div class="k">Time in lab</div></div>
+      <div class="stat"><div class="v">${s.completed.size}/${CHALLENGES.length}</div><div class="k">Missions done</div></div>
+      <div class="stat"><div class="v">${s.attempts}</div><div class="k">Mission attempts</div></div>
+      <div class="stat"><div class="v">${s.hints}</div><div class="k">Hints used</div></div>
+      <div class="stat"><div class="v">${s.correct}/${s.predictions}</div><div class="k">Predictions right</div></div>
+      <div class="stat"><div class="v">${s.jumps}</div><div class="k">Total jumps</div></div>
+    </div>
+    <p style="margin:0 0 6px"><b>Concepts explored:</b> ${esc([...s.concepts].join(', ') || 'none yet')}</p>
+    <p style="margin:0 0 6px"><b>Areas of difficulty:</b> ${esc(hard.map((c) => c.title).join(', ') || 'none flagged')}</p>
+    <p style="margin:0 0 12px"><b>Concepts to revisit:</b> ${esc(revisit.join(', ') || 'none flagged')}</p>
+    <p style="margin:0 0 12px;font-size:13px;color:var(--muted)">Stored only in this browser tab. No personal information is collected.</p>
+    <textarea id="sessText" readonly rows="6" style="width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px;font:13px var(--f-mono);color:var(--bone)">${esc(text)}</textarea>
+    <div class="row" style="margin-top:10px"><button class="btn" id="copySess">Copy summary</button><span id="copyMsg" style="font-size:13px;color:var(--muted)"></span><button class="btn ghost" id="closeSess" style="margin-left:auto">Close</button></div></section>`;
+  $('#closeSess').focus();
+}
+
+/* ============================== wiring ============================== */
+function announce(msg) { $('#live').textContent = msg; }
+const TOGGLES = [['path', 'Predicted path'], ['grid', 'Grid'], ['vectors', 'Velocity vectors'], ['measure', 'Measurements'], ['annot', 'Equation labels']];
+function renderToggles() {
+  $('#toggles').innerHTML = TOGGLES.map(([k, l]) => `<button class="chip" data-tog="${k}" aria-pressed="${S.toggles[k]}"${k === 'path' && hiddenByMission() ? ' disabled title="Hidden for this mission"' : ''}>${l}</button>`).join('');
+}
+function renderHeader() {
+  $('#tabExplore').setAttribute('aria-selected', S.mode === 'explore');
+  $('#tabChallenge').setAttribute('aria-selected', S.mode === 'challenge');
+  $('#uImp').setAttribute('aria-pressed', !met());
+  $('#uMet').setAttribute('aria-pressed', met());
+  $('#tutorBtn').setAttribute('aria-pressed', S.tutor);
+  $('#lvlSimple').setAttribute('aria-pressed', S.level === 'simple');
+  $('#lvlAdv').setAttribute('aria-pressed', S.level === 'advanced');
+  $('#ctlTitle').textContent = S.mode === 'challenge' ? 'Mission Setup' : 'Jump Setup';
+}
+function refreshAll() {
+  stopAnim();
+  S.anim.t = 0;
+  renderHeader();
+  buildControls();
+  renderToggles();
+  renderScene();
+  renderReadouts();
+  renderActivity();
+  renderWorkbench();
+  renderTutor();
+}
+function setMode(mode) {
+  if (mode === S.mode && !(mode === 'challenge' && !S.showList)) { if (mode === 'challenge') { S.showList = true; renderActivity(); } return; }
+  if (mode === 'explore') {
+    S.mode = 'explore';
+    S.tutorLocks = {};
+    S.ghosts = [];
+    if (S.exploreVars) S.vars = { ...S.exploreVars };
+    S.toggles.path = true;
+    refreshAll();
+  } else {
+    if (S.mode === 'explore') S.exploreVars = { ...S.vars };
+    if (S.mode !== 'challenge') loadChallenge(S.challengeId);
+    S.showList = true;
+    renderActivity();
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button');
+  if (!t || t.disabled) return;
+  const d = t.dataset;
+  if (t.id === 'tabExplore') return setMode('explore');
+  if (t.id === 'tabChallenge' || d.goto === 'challenge') return setMode('challenge');
+  if (t.id === 'uImp' || t.id === 'uMet') { S.units = t.id === 'uMet' ? 'metric' : 'imperial'; S.inputErr = {}; return refreshAll(); }
+  if (t.id === 'tutorBtn') { S.tutor = !S.tutor; renderHeader(); renderTutor(); renderActivity(); return; }
+  if (t.id === 'sessionBtn') return showSession();
+  if (t.id === 'closeSess') { $('#modal').hidden = true; return $('#sessionBtn').focus(); }
+  if (t.id === 'copySess') {
+    const txt = sessionSummary().text, msg = $('#copyMsg');
+    const fallback = () => { const ta = $('#sessText'); ta.focus(); ta.select(); msg.textContent = 'Selected. Press Ctrl/Cmd + C to copy.'; };
+    try { navigator.clipboard.writeText(txt).then(() => (msg.textContent = 'Copied.'), fallback); } catch { fallback(); }
+    return;
+  }
+  if (t.id === 'sendBtn') { hideOverlay(); return sendIt(); }
+  if (t.id === 'playBtn') return S.anim.playing ? stopAnim() : play();
+  if (t.id === 'resetBtn') { stopAnim(); S.anim.t = 0; S.flownKey = S.mode === 'explore' ? S.flownKey : null; hideOverlay(); renderScene(); renderReadouts(); return; }
+  if (d.tog) { S.toggles[d.tog] = !S.toggles[d.tog]; renderToggles(); return renderScene(); }
+  if (d.tab) { S.wbTab = d.tab; return renderWorkbench(); }
+  if (t.id === 'lvlSimple' || t.id === 'lvlAdv') { S.level = t.id === 'lvlAdv' ? 'advanced' : 'simple'; renderHeader(); return renderWorkbench(); }
+  if (t.id === 'wbToggle') { S.wbOpen = !S.wbOpen; $('#wbBody').hidden = !S.wbOpen; t.textContent = S.wbOpen ? 'Collapse' : 'Expand'; return t.setAttribute('aria-expanded', S.wbOpen); }
+  if (t.id === 'defsBtn') { S.defs = !S.defs; return renderWorkbench(); }
+  if (d.concept) { S.session.concepts.add(d.concept); const open = t.getAttribute('aria-expanded') === 'true'; t.setAttribute('aria-expanded', !open); return; }
+  // explore
+  if (t.id === 'predStart') { S.predict = { q: +$('#predSel').value, choice: null, done: false }; return renderActivity(); }
+  if (d.pick != null) { S.predict.choice = +d.pick; return renderActivity(); }
+  if (t.id === 'predReveal') return revealPrediction();
+  if (t.id === 'predUndo') { S.vars = { ...S.predict.undo }; S.predict = null; syncControls(); onSetupChanged(); return renderActivity(); }
+  if (t.id === 'predClose') { S.predict = null; return renderActivity(); }
+  if (t.id === 'saveA' || t.id === 'saveB') { S.compare[t.id.slice(-1)] = snapshot(); renderScene(); return renderActivity(); }
+  if (t.id === 'clearCmp') { S.compare = { A: null, B: null }; renderScene(); return renderActivity(); }
+  // challenge
+  if (t.id === 'toList') { S.showList = true; return renderActivity(); }
+  if (d.diff) { S.diffFilter = d.diff; return renderActivity(); }
+  if (d.ch) return loadChallenge(d.ch);
+  if (d.cpred != null) { chState(S.challengeId).predicted = +d.cpred; S.session.predictions++; if (+d.cpred === currentChallenge().prediction.answer) S.session.correct++; return renderActivity(); }
+  if (t.id === 'hintBtn' || d.thint != null) {
+    const c = currentChallenge(), st = chState(c.id);
+    const want = d.thint != null ? +d.thint + 1 : st.hints + 1;
+    const added = Math.max(0, Math.min(want, c.hints.length) - st.hints);
+    st.hints += added; S.session.hints += added;
+    renderActivity(); return renderTutor();
+  }
+  if (t.id === 'solBtn' || t.id === 'tSol') { chState(S.challengeId).solution = true; renderActivity(); return renderTutor(); }
+  if (t.id === 'ansLock') {
+    const raw = $('#ansIn').value.trim(), x = Number(raw);
+    if (raw === '' || !Number.isFinite(x) || x <= 0) { $('#ansErr').textContent = 'Enter a positive distance, like 21.5.'; return; }
+    chState(S.challengeId).answer = U.lengthToSI(x, S.units);
+    renderToggles(); renderScene(); renderReadouts(); renderActivity(); return renderWorkbench();
+  }
+  if (t.id === 'ansClear') { const st = chState(S.challengeId); st.answer = null; S.flownKey = null; renderToggles(); renderScene(); renderReadouts(); renderActivity(); return renderWorkbench(); }
+  // tutor
+  if (d.lock) { S.tutorLocks[d.lock] = !isLocked(d.lock); buildControls(); renderTutor(); return renderActivity(); }
+  if (t.id === 'tEq') { S.eqHidden = !S.eqHidden; renderTutor(); return renderWorkbench(); }
+  if (t.id === 'tBlind') { S.blind = !S.blind; S.revealed = !S.blind; renderTutor(); renderScene(); renderReadouts(); if (S.mode === 'explore') renderLiveFeedback(); return renderWorkbench(); }
+  if (t.id === 'tReveal') { S.revealed = true; renderTutor(); renderScene(); renderReadouts(); if (S.mode === 'explore') renderLiveFeedback(); return renderWorkbench(); }
+  if (t.id === 'tAsk') { S.discussQ = +$('#tQ').value; return showDiscussion(); }
+  if (t.id === 'dReveal') { hideOverlay(); S.revealed = true; renderTutor(); return sendIt(); }
+  if (t.id === 'dClose') return hideOverlay();
+  if (t.id === 'tReset') { S.tutorLocks = {}; resetSetup(); return renderTutor(); }
+});
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'rate') S.anim.rate = +e.target.value;
+  if (e.target.id === 'tActivity') { const v = e.target.value; if (v === 'explore') setMode('explore'); else { if (S.mode === 'explore') S.exploreVars = { ...S.vars }; loadChallenge(v); } }
+  if (e.target.id === 'tQ') S.discussQ = +e.target.value;
+});
+$('#scrub').addEventListener('input', (e) => { stopAnim(); S.anim.t = (+e.target.value / 1000) * S.anim.endT; renderDynamic(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (!$('#modal').hidden) { $('#modal').hidden = true; $('#sessionBtn').focus(); } else hideOverlay(); }
+  if (e.key === 'Enter' && e.target.id === 'ansIn') $('#ansLock').click();
+});
+
+let lastSmall = null;
+new ResizeObserver(() => { const sm = viewport().small; if (sm !== lastSmall) { lastSmall = sm; renderScene(); } }).observe($('.canvas-wrap'));
+
+refreshAll();
+
+return {  };
+})();
+</script>
+
+</body>
+</html>
